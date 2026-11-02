@@ -1,0 +1,135 @@
+/* ===== 右侧面板 ===== */
+#side { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 10px; min-height: 0; }
+.panel {
+  background: var(--paper); border: 3px solid #2a1a10; border-radius: 10px;
+  box-shadow: 0 4px 0 #1a100a; padding: 10px 12px; min-height: 0;
+}
+.empty { text-align: center; color: var(--ink-2); padding: 22px 0; }
+
+.pc-head { display: flex; gap: 10px; align-items: flex-start; }
+.portrait { width: 56px; height: 52px; image-rendering: pixelated; border: 2px solid var(--ink); border-radius: 6px; display: block; }
+.pc-name { flex: 1; }
+.pc-name b { font-family: var(--pixel); font-size: 20px; }
+.pc-name small { color: var(--ink-2); margin-left: 6px; }
+.pc-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
+.pc-tags span { font-size: 11px; background: var(--paper-2); border-radius: 8px; padding: 0 7px; }
+.pc-tags .regular { background: #ffe9a8; }
+.kind { font-size: 12px; color: #fff; padding: 2px 8px; border-radius: 10px; background: #8a7a6a; white-space: nowrap; }
+.k-custom { background: #7b5cc4; } .k-refund, .k-exchange { background: #d97a2b; }
+.k-complaint { background: var(--bad); } .k-haggle { background: #c4a12b; }
+.k-bulk, .k-outofstock { background: #2b8ac4; } .k-buy, .k-inquiry { background: var(--good); }
+.pc-persona { margin: 8px 0 6px; font-size: 13px; }
+.pc-persona small { color: var(--ink-2); }
+.spoiler { font-size: 12px; background: #fff0d0; border: 1px dashed #d8b37a; border-radius: 6px; padding: 4px 8px; }
+.spoiler summary { cursor: pointer; color: var(--ink-2); }
+.spoiler p { margin: 4px 0 2px; }
+
+.verdict { display: none; gap: 10px; margin-top: 8px; padding-top: 8px; border-top: 2px dashed #e0c9a0; }
+.verdict.show { display: flex; animation: slide 0.3s ease-out; }
+@keyframes slide { from { opacity: 0; transform: translateY(6px); } }
+.v-score { width: 62px; height: 62px; border-radius: 50%; display: grid; place-content: center; text-align: center; color: #fff; flex: none; border: 3px solid var(--ink); }
+.v-score b { font-family: var(--num); font-size: 30px; line-height: 0.9; }
+.v-score small { font-size: 10px; }
+.v-score.good { background: var(--good); } .v-score.mid { background: var(--mid); } .v-score.bad { background: var(--bad); }
+.v-body { flex: 1; font-size: 12px; }
+.v-flags { display: flex; gap: 8px; flex-wrap: wrap; }
+.v-flags .y { color: var(--good); } .v-flags .n { color: var(--bad); }
+.v-tags { margin: 3px 0; display: flex; gap: 4px; flex-wrap: wrap; }
+.v-tags i { font-style: normal; background: var(--paper-2); border-radius: 6px; padding: 0 5px; }
+.v-body q { color: var(--ink-2); }
+
+#chat { display: flex; flex-direction: column; }
+.panel-title { font-family: var(--pixel); font-size: 17px; margin-bottom: 6px; }
+.panel-title small { font-family: inherit; font-size: 12px; color: var(--ink-2); }
+.log { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 7px; padding-right: 4px; scroll-behavior: smooth; }
+.log::-webkit-scrollbar { width: 6px; }
+.log::-webkit-scrollbar-thumb { background: #d8c39c; border-radius: 3px; }
+.sep { text-align: center; font-size: 12px; color: var(--ink-2); margin: 6px 0 2px; }
+.msg { max-width: 88%; padding: 6px 9px; border-radius: 9px; font-size: 13px; animation: slide 0.2s ease-out; }
+.msg .who { font-size: 11px; color: var(--ink-2); display: flex; justify-content: space-between; gap: 10px; }
+.msg time { font-family: var(--num); font-size: 13px; }
+.msg.customer { background: #fff; border: 2px solid #e8d6b5; align-self: flex-start; border-bottom-left-radius: 2px; }
+.msg.shopkeeper { background: #e4f4e8; border: 2px solid #b9dcc3; align-self: flex-end; border-bottom-right-radius: 2px; }
+.msg.system { align-self: center; background: none; color: var(--ink-2); font-size: 12px; padding: 0; text-align: center; }
+.msg.error { align-self: stretch; background: #ffe1dc; color: var(--bad); font-size: 12px; max-width: none; }
+.acts { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.act { font-size: 11px; background: #fff; border: 1px solid #b9dcc3; border-radius: 8px; padding: 0 6px; }
+.act.refund { border-color: #f0a090; } .act.gift { border-color: #e7b0d0; } .act.disc { border-color: #e9cf7a; }
+.thought { font-size: 11px; color: #6a8a74; margin-top: 3px; }
+
+/* ===== 弹窗 ===== */
+#modal { position: fixed; inset: 0; background: rgba(20, 12, 8, 0.72); display: grid; place-items: center; z-index: 50; padding: 16px; }
+#modal[hidden] { display: none; }
+.sheet {
+  background: var(--paper); border: 4px solid #2a1a10; border-radius: 14px;
+  box-shadow: 0 8px 0 #1a100a, 0 0 0 4px var(--wood-hi);
+  padding: 22px 28px; width: min(520px, 100%); text-align: center; animation: pop2 0.25s ease-out;
+}
+@keyframes pop2 { from { transform: scale(0.85); opacity: 0; } }
+.title-art { font-size: 56px; line-height: 1; }
+.sheet h1 { font-family: var(--pixel); font-size: 40px; margin: 6px 0; letter-spacing: 6px; }
+.sheet h2 { font-family: var(--pixel); font-size: 24px; margin: 0; }
+.sub { color: var(--ink-2); }
+.howto { text-align: left; margin: 12px 0; padding-left: 20px; font-size: 13px; }
+.howto li { margin: 4px 0; }
+.hint { font-size: 12px; color: var(--ink-2); }
+.backend-note { display: block; margin-top: 10px; color: var(--ink-2); font-size: 11px; }
+.report-head { display: flex; align-items: center; gap: 14px; text-align: left; margin-bottom: 12px; }
+.grade { font-family: var(--num); font-size: 54px; width: 72px; height: 72px; display: grid; place-items: center; border-radius: 12px; color: #fff; border: 3px solid var(--ink); }
+.g-S { background: linear-gradient(135deg, #ffcf3a, #ff8a3a); } .g-A { background: var(--good); }
+.g-B { background: #2b8ac4; } .g-C { background: var(--mid); } .g-D { background: var(--bad); }
+.report-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.report-grid div { background: var(--paper-2); border-radius: 8px; padding: 6px; }
+.report-grid label { display: block; font-size: 11px; color: var(--ink-2); }
+.report-grid b { font-family: var(--num); font-size: 26px; }
+.kinds { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: 10px 0; font-size: 12px; }
+.kinds span { background: #fff; border: 1px solid #e0c9a0; border-radius: 8px; padding: 0 8px; }
+blockquote { margin: 8px 0; padding: 6px 12px; border-radius: 8px; text-align: left; font-size: 13px; }
+blockquote.good { background: #e4f4e8; } blockquote.bad { background: #ffe9e4; }
+blockquote cite { display: block; font-size: 11px; color: var(--ink-2); font-style: normal; text-align: right; }
+.row { display: flex; gap: 10px; justify-content: center; margin-top: 12px; }
+
+/* ===== 来客条 ===== */
+#left { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+#left #scene-wrap { flex: none; }
+#visitors { flex: 1; display: flex; flex-direction: column; min-height: 118px; padding: 8px 12px; }
+#visitors .panel-title { margin-bottom: 4px; }
+.v-row { display: flex; gap: 8px; overflow-x: auto; overflow-y: hidden; padding: 2px 0 6px; align-items: flex-start; flex: none; }
+.v-row .empty { padding: 8px 0; }
+.vtoken {
+  flex: none; width: 76px; text-align: center; border: 2px solid var(--ink); border-radius: 8px;
+  background: #fff; padding: 4px 2px; cursor: default; animation: slide 0.3s ease-out;
+  display: flex; flex-direction: column; line-height: 1.2;
+}
+.vtoken b { font-family: var(--num); font-size: 22px; line-height: 1; }
+.vtoken span { font-size: 12px; }
+.vtoken small { font-size: 10px; color: var(--ink-2); }
+.vtoken.good { box-shadow: inset 0 -5px 0 var(--good); } .vtoken.good b { color: var(--good); }
+.vtoken.mid { box-shadow: inset 0 -5px 0 var(--mid); } .vtoken.mid b { color: var(--mid); }
+.vtoken.bad { box-shadow: inset 0 -5px 0 var(--bad); } .vtoken.bad b { color: var(--bad); }
+
+/* 店主动过手的记录：折叠起来，只露一句人话 */
+details.tool {
+  font-size: 12px;
+  color: #6b5a45;
+  opacity: 0.85;
+  margin: 2px 0;
+}
+details.tool summary {
+  cursor: pointer;
+  list-style: none;
+}
+details.tool summary::-webkit-details-marker {
+  display: none;
+}
+details.tool[open] summary {
+  opacity: 1;
+}
+details.tool .tool-detail {
+  margin-top: 4px;
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 6px;
+  white-space: pre-wrap;
+  opacity: 0.9;
+}
