@@ -1,26 +1,11 @@
 import type { LogRunDetail, LogRunSummary, LogTrace, ServerCard } from '../server/types';
 import { ServerClient } from '../server/client';
+import { dict, getLocale, isEn, setLocale, t } from '../i18n';
 import '../logs.css';
 
 type View = 'traces' | 'score' | 'events';
 type Entry = { id: string; name: string; card?: ServerCard; count: number };
 
-const KIND_NAMES: Record<string, string> = {
-  prompt: '提示词',
-  'model.request': '模型请求',
-  'model.response': '模型返回',
-  reasoning: '模型思考',
-  'tool.call': '工具调用',
-  'tool.result': '工具结果',
-  'actor.response': '角色回复',
-  transaction: '交易',
-  error: '错误',
-  observation: '环境观察',
-};
-
-const ACTOR_NAMES: Record<string, string> = {
-  owner: '店主', customer: '顾客', judge: '评委', environment: '环境', system: '系统',
-};
 const PAGE_SIZE = 100;
 
 const escapeHtml = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
@@ -32,16 +17,18 @@ function pretty(value: unknown): string {
   return JSON.stringify(value, null, 2) ?? String(value);
 }
 
+const localeTag = () => (isEn() ? 'en-US' : 'zh-CN');
+
 function dateLabel(value: unknown): string {
-  if (!value) return '时间未知';
+  if (!value) return t('lw.dateUnknown');
   const date = new Date(String(value));
-  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString('zh-CN', { hour12: false });
+  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString(localeTag(), { hour12: false });
 }
 
 function timeLabel(value: unknown): string {
   if (!value) return '';
   const date = new Date(String(value));
-  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleTimeString('zh-CN', { hour12: false });
+  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleTimeString(localeTag(), { hour12: false });
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -66,7 +53,11 @@ function money(value: unknown): string {
 }
 
 function actorName(value: unknown): string {
-  return ACTOR_NAMES[String(value ?? '')] ?? String(value ?? '未知角色');
+  return dict().ACTOR[String(value ?? '')] ?? String(value ?? '');
+}
+
+function kindName(value: string): string {
+  return dict().LOG_KIND[value] ?? value;
 }
 
 function download(name: string, value: unknown) {
@@ -242,28 +233,29 @@ export class LogWorkspace {
   }
 
   private render() {
+    const langLabel = getLocale() === 'en' ? '中文' : 'EN';
     this.root.innerHTML = `
-      <a class="lw-skip" href="#lw-content">跳到日志内容</a>
+      <a class="lw-skip" href="#lw-content">${t('lw.skip')}</a>
       <header class="lw-header">
-        <div class="lw-brand"><span class="lw-brand-mark" aria-hidden="true">▦</span><div><b>小镇百货</b><small>运行日志</small></div></div>
-        <nav class="lw-nav" aria-label="页面"><button type="button" data-action="shop">商店</button><span class="lw-nav-active" aria-current="page">日志工作台</span><button type="button" data-action="memory">记忆</button></nav>
+        <div class="lw-brand"><span class="lw-brand-mark" aria-hidden="true">▦</span><div><b>${t('lw.brand')}</b><small>${t('lw.brandSub')}</small></div></div>
+        <nav class="lw-nav" aria-label="${t('lw.navAria')}"><button type="button" data-action="shop">${t('lw.navShop')}</button><span class="lw-nav-active" aria-current="page">${t('lw.navActive')}</span><button type="button" data-action="memory">${t('lw.navMemory')}</button><button type="button" data-action="lang" class="lw-lang" title="${t('lw.langTitle')}">${langLabel}</button></nav>
         <div id="lw-status" class="lw-status" aria-live="polite"></div>
       </header>
       <div class="lw-layout">
-        <aside class="lw-sidebar" aria-label="运行轮次"><div class="lw-side-head"><div><span class="lw-eyebrow">运行档案</span><h2>全部轮次</h2></div><button type="button" class="lw-icon-btn" data-action="refresh" title="刷新日志" aria-label="刷新日志">↻</button></div><div id="lw-runs" class="lw-runs"></div></aside>
+        <aside class="lw-sidebar" aria-label="${t('lw.sideAria')}"><div class="lw-side-head"><div><span class="lw-eyebrow">${t('lw.eyebrowRuns')}</span><h2>${t('lw.allRuns')}</h2></div><button type="button" class="lw-icon-btn" data-action="refresh" title="${t('lw.refreshTitle')}" aria-label="${t('lw.refreshTitle')}">↻</button></div><div id="lw-runs" class="lw-runs"></div></aside>
         <main id="lw-content" class="lw-main" tabindex="-1"></main>
       </div>
       <div id="lw-memory" class="lw-memory" hidden role="dialog" aria-modal="true" aria-labelledby="lw-memory-title">
         <section class="lw-memory-sheet">
           <header class="lw-memory-head">
-            <div><span class="lw-memory-kicker">Memory</span><h2 id="lw-memory-title">陈一鸣</h2></div>
-            <button type="button" class="lw-memory-close" data-action="close-memory" aria-label="关闭记忆">×</button>
+            <div><span class="lw-memory-kicker">Memory</span><h2 id="lw-memory-title">${t('mem.name')}</h2></div>
+            <button type="button" class="lw-memory-close" data-action="close-memory" aria-label="${t('mem.close')}">×</button>
           </header>
           <div class="lw-memory-list">
-            <article class="lw-memory-note is-goal"><span class="lw-memory-type">目标</span><p>正在筹备周末的柠檬茶摊，采购预算约 200 元。</p></article>
-            <article class="lw-memory-note is-access"><span class="lw-memory-type">出行与居住</span><p>住六楼，没有电梯，骑电动车出行，采购时应考虑便携性。</p></article>
-            <article class="lw-memory-note is-preference"><span class="lw-memory-type">偏好</span><p>偏好可重复使用的摆摊工具，但这一偏好不适用于一次性饮料杯。</p></article>
-            <article class="lw-memory-note is-schedule"><span class="lw-memory-type">日程</span><p>计划白天摆摊，时间为 10:00—16:00。</p></article>
+            <article class="lw-memory-note is-goal"><span class="lw-memory-type">${t('mem.typeGoal')}</span><p>${t('mem.goalNote')}</p></article>
+            <article class="lw-memory-note is-access"><span class="lw-memory-type">${t('mem.typeAccess')}</span><p>${t('mem.accessNote')}</p></article>
+            <article class="lw-memory-note is-preference"><span class="lw-memory-type">${t('mem.typePreference')}</span><p>${t('mem.prefNote')}</p></article>
+            <article class="lw-memory-note is-schedule"><span class="lw-memory-type">${t('mem.typeSchedule')}</span><p>${t('mem.scheduleNote')}</p></article>
           </div>
         </section>
       </div>`;
@@ -276,8 +268,8 @@ export class LogWorkspace {
     const target = this.root.querySelector('#lw-status');
     if (!target) return;
     target.innerHTML = this.error
-      ? `<span class="lw-status-error" title="${escapeHtml(this.error)}">连接失败</span><button type="button" data-action="refresh">重试</button>`
-      : `<span class="lw-live-dot"></span>${this.loadingRuns || this.loadingDetail ? '读取中' : '每 5 秒检查新日志'}`;
+      ? `<span class="lw-status-error" title="${escapeHtml(this.error)}">${t('lw.connFailed')}</span><button type="button" data-action="refresh">${t('lw.retry')}</button>`
+      : `<span class="lw-live-dot"></span>${this.loadingRuns || this.loadingDetail ? t('lw.loading') : t('lw.polling')}`;
   }
 
   private renderRuns() {
@@ -288,14 +280,14 @@ export class LogWorkspace {
       return;
     }
     if (!this.runs.length) {
-      target.innerHTML = `<div class="lw-side-empty">${this.error ? '暂时无法读取轮次。' : '还没有运行记录。'}</div>`;
+      target.innerHTML = `<div class="lw-side-empty">${this.error ? t('lw.runsUnavailable') : t('lw.noRuns')}</div>`;
       return;
     }
     target.innerHTML = this.runs.map((run, index) => `
       <button type="button" class="lw-run ${run.run_id === this.runId ? 'is-active' : ''}" data-run="${escapeHtml(run.run_id)}" aria-current="${run.run_id === this.runId ? 'true' : 'false'}">
-        <span class="lw-run-top"><strong title="${escapeHtml(run.run_id)}">${escapeHtml(run.run_id)}</strong><span>${index === 0 ? '最新' : ''}</span></span>
-        <time>${escapeHtml(dateLabel(run.started))}</time><span class="lw-run-bottom">${run.encounters} 次接待 <span aria-hidden="true">↗</span></span>
-        <span class="lw-run-state">${run.encounters === 0 && run.trace_count === 0 ? '待开始' : run.trace_count === 0 ? '无模型过程记录' : `${run.trace_count} 条过程记录`}</span>
+        <span class="lw-run-top"><strong title="${escapeHtml(run.run_id)}">${escapeHtml(run.run_id)}</strong><span>${index === 0 ? t('lw.latest') : ''}</span></span>
+        <time>${escapeHtml(dateLabel(run.started))}</time><span class="lw-run-bottom">${t('lw.encounters', { n: run.encounters })} <span aria-hidden="true">↗</span></span>
+        <span class="lw-run-state">${run.encounters === 0 && run.trace_count === 0 ? t('lw.pending') : run.trace_count === 0 ? t('lw.noTraces') : t('lw.traceCount', { n: run.trace_count })}</span>
       </button>`).join('');
   }
 
@@ -305,7 +297,7 @@ export class LogWorkspace {
     const cards = this.detail.encounters ?? [];
     const entries: Entry[] = cards.map((card, index) => ({
       id: String(card.session_id ?? `encounter-${index + 1}`),
-      name: String(card.profile_name ?? `第 ${index + 1} 位顾客`),
+      name: String(card.profile_name ?? t('lw.customerN', { n: index + 1 })),
       card,
       count: 0,
     }));
@@ -313,7 +305,7 @@ export class LogWorkspace {
       if (!trace.encounter_id) continue;
       let entry = entries.find((item) => item.id === trace.encounter_id);
       if (!entry) {
-        entry = { id: trace.encounter_id, name: `接待 ${entries.length + 1}`, count: 0 };
+        entry = { id: trace.encounter_id, name: t('lw.encounterN', { n: entries.length + 1 }), count: 0 };
         entries.push(entry);
       }
       entry.count++;
@@ -342,8 +334,8 @@ export class LogWorkspace {
     const caret = searchFocused ? search?.selectionStart : null;
     if (!this.detail) {
       target.innerHTML = this.loadingDetail || this.loadingRuns
-        ? '<div class="lw-empty-state"><div class="lw-loading-bar"></div><h1>正在读取运行日志</h1><p>接待过程和模型记录读取完成后会显示在这里。</p></div>'
-        : `<div class="lw-empty-state"><span class="lw-empty-mark">▤</span><h1>${this.error ? '日志暂时无法读取' : '暂无运行日志'}</h1><p>${this.error ? escapeHtml(this.error) : '从商店开始一次接待后，运行记录会出现在这里。'}</p><div class="lw-empty-actions">${this.error ? '<button type="button" data-action="refresh">重新读取</button>' : '<button type="button" data-action="shop">返回商店</button>'}<button type="button" class="lw-solid-btn" data-action="memory">查看记忆</button></div></div>`;
+        ? `<div class="lw-empty-state"><div class="lw-loading-bar"></div><h1>${t('lw.loadingTitle')}</h1><p>${t('lw.loadingSub')}</p></div>`
+        : `<div class="lw-empty-state"><span class="lw-empty-mark">▤</span><h1>${this.error ? t('lw.errTitle') : t('lw.emptyTitle')}</h1><p>${this.error ? escapeHtml(this.error) : t('lw.emptySub')}</p><div class="lw-empty-actions">${this.error ? `<button type="button" data-action="refresh">${t('lw.reread')}</button>` : `<button type="button" data-action="shop">${t('lw.backShop')}</button>`}<button type="button" class="lw-solid-btn" data-action="memory">${t('lw.viewMemory')}</button></div></div>`;
       return;
     }
     const entries = this.entries();
@@ -356,18 +348,18 @@ export class LogWorkspace {
     const coverage = asRecord(this.detail.coverage);
     const coverageNote = coverage?.note;
     target.innerHTML = `
-      ${this.error ? `<div class="lw-error-banner" role="alert"><span>日志更新失败：${escapeHtml(this.error)}</span><button type="button" data-action="refresh">重试</button></div>` : ''}
+      ${this.error ? `<div class="lw-error-banner" role="alert"><span>${t('lw.updateFailed')}：${escapeHtml(this.error)}</span><button type="button" data-action="refresh">${t('lw.retry')}</button></div>` : ''}
       <div class="lw-overview">
-        <div><span class="lw-eyebrow">运行记录 / ${run?.encounters === 0 && run.trace_count === 0 ? '待开始' : '已保存数据'}</span><h1>${escapeHtml(run ? dateLabel(run.started) : this.runId)}</h1><p class="lw-run-id" title="${escapeHtml(this.runId)}">${escapeHtml(this.runId)}</p></div>
-        <div class="lw-overview-actions"><button type="button" data-action="copy-run">复制轮次 ID</button><button type="button" class="lw-solid-btn" data-action="export-run">导出 JSON ↓</button></div>
+        <div><span class="lw-eyebrow">${t('lw.runRecord')} / ${run?.encounters === 0 && run.trace_count === 0 ? t('lw.pending') : t('lw.overviewSaved')}</span><h1>${escapeHtml(run ? dateLabel(run.started) : this.runId)}</h1><p class="lw-run-id" title="${escapeHtml(this.runId)}">${escapeHtml(this.runId)}</p></div>
+        <div class="lw-overview-actions"><button type="button" data-action="copy-run">${t('lw.copyRun')}</button><button type="button" class="lw-solid-btn" data-action="export-run">${t('lw.exportRun')}</button></div>
       </div>
-      <div class="lw-metrics" aria-label="本轮概况"><div><strong>${entries.length}</strong><span>次接待</span></div><div><strong>${this.detail.traces?.length ?? 0}</strong><span>条过程记录</span></div><div><strong>${this.detail.events?.length ?? 0}</strong><span>条服务事件</span></div><div class="lw-coverage"><span>记录范围</span><strong>${escapeHtml(coverageNote ?? '以实际保存的记录为准')}</strong></div></div>
-      <section class="lw-browser" aria-label="按接待浏览"><div class="lw-section-head"><div><span class="lw-eyebrow">接待索引</span><h2>顾客与过程</h2></div><span>${entries.length} 次接待</span></div>
-        <div class="lw-encounters" role="group" aria-label="选择接待"><button type="button" class="lw-encounter ${this.encounterId === 'all' ? 'is-active' : ''}" data-encounter="all"><b>全部过程</b><small>${this.detail.traces?.length ?? 0} 条</small></button>${entries.map((entry, index) => `<button type="button" class="lw-encounter ${this.encounterId === entry.id ? 'is-active' : ''}" data-encounter="${escapeHtml(entry.id)}"><span class="lw-encounter-index">${String(index + 1).padStart(2, '0')}</span><b>${escapeHtml(entry.name)}</b><small>${entry.count} 条</small></button>`).join('')}</div>
+      <div class="lw-metrics" aria-label="${t('lw.runOverview')}"><div><strong>${entries.length}</strong><span>${t('lw.metricVisits')}</span></div><div><strong>${this.detail.traces?.length ?? 0}</strong><span>${t('lw.metricTraces')}</span></div><div><strong>${this.detail.events?.length ?? 0}</strong><span>${t('lw.metricEvents')}</span></div><div class="lw-coverage"><span>${t('lw.coverage')}</span><strong>${escapeHtml(coverageNote ?? t('lw.coverageDefault'))}</strong></div></div>
+      <section class="lw-browser" aria-label="${t('lw.browserAria')}"><div class="lw-section-head"><div><span class="lw-eyebrow">${t('lw.eyebrowIndex')}</span><h2>${t('lw.browserTitle')}</h2></div><span>${t('lw.encounters', { n: entries.length })}</span></div>
+        <div class="lw-encounters" role="group" aria-label="${t('lw.selectAria')}"><button type="button" class="lw-encounter ${this.encounterId === 'all' ? 'is-active' : ''}" data-encounter="all"><b>${t('lw.groupAll')}</b><small>${t('lw.traceN', { n: this.detail.traces?.length ?? 0 })}</small></button>${entries.map((entry, index) => `<button type="button" class="lw-encounter ${this.encounterId === entry.id ? 'is-active' : ''}" data-encounter="${escapeHtml(entry.id)}"><span class="lw-encounter-index">${String(index + 1).padStart(2, '0')}</span><b>${escapeHtml(entry.name)}</b><small>${t('lw.traceN', { n: entry.count })}</small></button>`).join('')}</div>
       </section>
-      <div class="lw-content-head"><div><span class="lw-eyebrow">${selected ? escapeHtml(selected.name) : '整轮记录'}</span><h2>${this.view === 'traces' ? '过程时间线' : this.view === 'score' ? '接待档案' : '服务事件'}</h2></div><div class="lw-content-tools">${selected ? '<button type="button" data-action="export-encounter">导出本次接待 ↓</button>' : ''}<div class="lw-tabs" role="tablist" aria-label="日志内容"><button type="button" role="tab" aria-selected="${this.view === 'traces'}" data-view="traces">过程</button><button type="button" role="tab" aria-selected="${this.view === 'score'}" data-view="score">评分与对话</button><button type="button" role="tab" aria-selected="${this.view === 'events'}" data-view="events">原始事件</button></div></div></div>
-      ${this.view === 'traces' ? `<div class="lw-filters"><label class="lw-search"><span aria-hidden="true">⌕</span><input id="lw-search" type="search" value="${escapeHtml(this.query)}" placeholder="搜索提示词、工具、回复…" aria-label="搜索过程记录"></label><label><span>类型</span><select id="lw-kind"><option value="all">全部类型</option>${kinds.map((kind) => `<option value="${escapeHtml(kind)}" ${this.kind === kind ? 'selected' : ''}>${escapeHtml(KIND_NAMES[kind] ?? kind)}</option>`).join('')}</select></label><label><span>角色</span><select id="lw-actor"><option value="all">全部角色</option>${actors.map((actor) => `<option value="${escapeHtml(actor)}" ${this.actor === actor ? 'selected' : ''}>${escapeHtml(actorName(actor))}</option>`).join('')}</select></label><span class="lw-result-count">${traces.length} 条结果</span></div>${this.renderTraces(traces)}` : this.view === 'score' ? this.renderScores(selected) : this.renderEvents(selected)}
-      <details class="lw-coverage-details" data-item="coverage" ${this.openItems.has('coverage') ? 'open' : ''}><summary>记录范围与采集信息</summary><pre>${escapeHtml(pretty(this.detail.coverage ?? {}))}</pre></details>`;
+      <div class="lw-content-head"><div><span class="lw-eyebrow">${selected ? escapeHtml(selected.name) : t('lw.wholeRun')}</span><h2>${this.view === 'traces' ? t('lw.tabTracesTitle') : this.view === 'score' ? t('lw.tabScoreTitle') : t('lw.tabEventsTitle')}</h2></div><div class="lw-content-tools">${selected ? `<button type="button" data-action="export-encounter">${t('lw.exportEncounter')}</button>` : ''}<div class="lw-tabs" role="tablist" aria-label="${t('lw.navActive')}"><button type="button" role="tab" aria-selected="${this.view === 'traces'}" data-view="traces">${t('lw.tabTraces')}</button><button type="button" role="tab" aria-selected="${this.view === 'score'}" data-view="score">${t('lw.tabScore')}</button><button type="button" role="tab" aria-selected="${this.view === 'events'}" data-view="events">${t('lw.tabEvents')}</button></div></div></div>
+      ${this.view === 'traces' ? `<div class="lw-filters"><label class="lw-search"><span aria-hidden="true">⌕</span><input id="lw-search" type="search" value="${escapeHtml(this.query)}" placeholder="${t('lw.searchPlaceholder')}" aria-label="${t('lw.searchAria')}"></label><label><span>${t('lw.filterKind')}</span><select id="lw-kind"><option value="all">${t('lw.allKinds')}</option>${kinds.map((kind) => `<option value="${escapeHtml(kind)}" ${this.kind === kind ? 'selected' : ''}>${escapeHtml(kindName(kind))}</option>`).join('')}</select></label><label><span>${t('lw.filterActor')}</span><select id="lw-actor"><option value="all">${t('lw.allActors')}</option>${actors.map((actor) => `<option value="${escapeHtml(actor)}" ${this.actor === actor ? 'selected' : ''}>${escapeHtml(actorName(actor))}</option>`).join('')}</select></label><span class="lw-result-count">${t('lw.resultCount', { n: traces.length })}</span></div>${this.renderTraces(traces)}` : this.view === 'score' ? this.renderScores(selected) : this.renderEvents(selected)}
+      <details class="lw-coverage-details" data-item="coverage" ${this.openItems.has('coverage') ? 'open' : ''}><summary>${t('lw.coverageDetails')}</summary><pre>${escapeHtml(pretty(this.detail.coverage ?? {}))}</pre></details>`;
     if (preserveScroll) {
       target.scrollTop = scroll;
       this.root.scrollTop = pageScroll;
@@ -380,13 +372,14 @@ export class LogWorkspace {
   }
 
   private renderTraces(traces: LogTrace[]): string {
-    if (!traces.length && this.kind === 'reasoning') return `<div class="lw-list-empty"><h3>暂无模型思考记录</h3><p>${escapeHtml(this.detail?.coverage.reasoning_note ?? '当前记录没有模型实际返回的独立思考内容。')}</p></div>`;
-    if (!traces.length) return `<div class="lw-list-empty"><span>∅</span><h3>${this.query || this.kind !== 'all' || this.actor !== 'all' ? '没有匹配的过程记录' : '这次接待没有过程记录'}</h3><p>${this.query || this.kind !== 'all' || this.actor !== 'all' ? '试试其他关键词或筛选条件。' : '历史轮次可能只有评分与对话，可在相邻标签查看。'}</p></div>`;
+    if (!traces.length && this.kind === 'reasoning') return `<div class="lw-list-empty"><h3>${t('lw.noReasoningTitle')}</h3><p>${escapeHtml(this.detail?.coverage.reasoning_note ?? t('lw.noReasoningDefault'))}</p></div>`;
+    if (!traces.length) return `<div class="lw-list-empty"><span>∅</span><h3>${this.query || this.kind !== 'all' || this.actor !== 'all' ? t('lw.noMatchTitle') : t('lw.noTracesTitle')}</h3><p>${this.query || this.kind !== 'all' || this.actor !== 'all' ? t('lw.noMatchHint') : t('lw.noTracesHint')}</p></div>`;
     return `<ol class="lw-timeline">${traces.slice(0, this.traceLimit).map((trace, index) => {
       const id = trace.id || `trace-${index}`;
-      const title = trace.title || KIND_NAMES[trace.kind] || trace.kind;
-      return `<li class="lw-trace lw-trace-${trace.kind === 'error' ? 'error' : trace.kind.startsWith('tool.') ? 'tool' : trace.kind.startsWith('model.') ? 'model' : 'default'}"><div class="lw-trace-marker" aria-hidden="true"></div><details data-item="${escapeHtml(id)}" ${this.openItems.has(id) ? 'open' : ''}><summary><span class="lw-trace-kind">${escapeHtml(KIND_NAMES[trace.kind] ?? trace.kind)}</span><span class="lw-trace-title">${escapeHtml(title)}</span><span class="lw-trace-meta">${trace.turn == null ? '' : `第 ${escapeHtml(trace.turn)} 轮 · `}${trace.actor || trace.phase ? escapeHtml(actorName(trace.actor ?? trace.phase)) : ''}${trace.ts ? ` · ${escapeHtml(timeLabel(trace.ts))}` : ''}</span><span class="lw-chevron" aria-hidden="true">⌄</span></summary><div class="lw-trace-body">${this.renderTraceData(trace)}<div class="lw-item-actions"><button type="button" data-copy-trace="${escapeHtml(id)}">复制这条记录</button></div></div></details></li>`;
-    }).join('')}</ol>${traces.length > this.traceLimit ? `<div class="lw-more"><span>已显示 ${this.traceLimit} / ${traces.length} 条</span><button type="button" data-action="more-traces">再显示 ${Math.min(PAGE_SIZE, traces.length - this.traceLimit)} 条</button></div>` : ''}`;
+      const title = trace.title || kindName(trace.kind);
+      const turnLabel = trace.turn == null ? '' : `${t('lw.turnN', { n: trace.turn })} · `;
+      return `<li class="lw-trace lw-trace-${trace.kind === 'error' ? 'error' : trace.kind.startsWith('tool.') ? 'tool' : trace.kind.startsWith('model.') ? 'model' : 'default'}"><div class="lw-trace-marker" aria-hidden="true"></div><details data-item="${escapeHtml(id)}" ${this.openItems.has(id) ? 'open' : ''}><summary><span class="lw-trace-kind">${escapeHtml(kindName(trace.kind))}</span><span class="lw-trace-title">${escapeHtml(title)}</span><span class="lw-trace-meta">${turnLabel}${trace.actor || trace.phase ? escapeHtml(actorName(trace.actor ?? trace.phase)) : ''}${trace.ts ? ` · ${escapeHtml(timeLabel(trace.ts))}` : ''}</span><span class="lw-chevron" aria-hidden="true">⌄</span></summary><div class="lw-trace-body">${this.renderTraceData(trace)}<div class="lw-item-actions"><button type="button" data-copy-trace="${escapeHtml(id)}">${t('lw.copyTrace')}</button></div></div></details></li>`;
+    }).join('')}</ol>${traces.length > this.traceLimit ? `<div class="lw-more"><span>${t('lw.showing', { a: this.traceLimit, b: traces.length })}</span><button type="button" data-action="more-traces">${t('lw.moreTraces', { n: Math.min(PAGE_SIZE, traces.length - this.traceLimit) })}</button></div>` : ''}`;
   }
 
   private renderTraceData(trace: LogTrace): string {
@@ -395,7 +388,7 @@ export class LogWorkspace {
       return `<div class="lw-sections">${data.sections.map((section, index) => {
         const item = asRecord(section);
         const key = `${trace.id}-section-${index}`;
-        return `<details data-item="${escapeHtml(key)}" ${this.openItems.has(key) ? 'open' : ''}><summary><span>${escapeHtml(item?.label ?? item?.kind ?? `片段 ${index + 1}`)}</span><small>${escapeHtml(item?.kind ?? '')}</small></summary><pre>${escapeHtml(pretty(item?.content ?? section))}</pre></details>`;
+        return `<details data-item="${escapeHtml(key)}" ${this.openItems.has(key) ? 'open' : ''}><summary><span>${escapeHtml(item?.label ?? item?.kind ?? t('lw.sectionN', { n: index + 1 }))}</span><small>${escapeHtml(item?.kind ?? '')}</small></summary><pre>${escapeHtml(pretty(item?.content ?? section))}</pre></details>`;
       }).join('')}</div>`;
     }
     if (trace.kind === 'model.request' && data) {
@@ -403,32 +396,33 @@ export class LogWorkspace {
       const { messages, tools, ...parameters } = body;
       const metadata = body === data ? null : Object.fromEntries(Object.entries(data).filter(([key]) => key !== 'body'));
       const requestKey = `${trace.id}-body`;
-      return `<div class="lw-sections">${metadata && Object.keys(metadata).length ? `<details data-item="${escapeHtml(trace.id)}-meta" ${this.openItems.has(`${trace.id}-meta`) ? 'open' : ''}><summary>调用信息</summary><pre>${escapeHtml(pretty(metadata))}</pre></details>` : ''}<details data-item="${escapeHtml(requestKey)}" ${this.openItems.has(requestKey) ? 'open' : ''}><summary>请求参数 <small>实际发送的 API body</small></summary><pre>${escapeHtml(pretty(parameters))}</pre></details>${Array.isArray(messages) ? messages.map((message, index) => {
+      return `<div class="lw-sections">${metadata && Object.keys(metadata).length ? `<details data-item="${escapeHtml(trace.id)}-meta" ${this.openItems.has(`${trace.id}-meta`) ? 'open' : ''}><summary>${t('lw.callInfo')}</summary><pre>${escapeHtml(pretty(metadata))}</pre></details>` : ''}<details data-item="${escapeHtml(requestKey)}" ${this.openItems.has(requestKey) ? 'open' : ''}><summary>${t('lw.reqParams')} <small>${t('lw.reqParamsSub')}</small></summary><pre>${escapeHtml(pretty(parameters))}</pre></details>${Array.isArray(messages) ? messages.map((message, index) => {
         const role = asRecord(message)?.role;
         const key = `${trace.id}-message-${index}`;
-        const label = role === 'system' ? '系统提示词' : role === 'user' ? '用户消息' : role === 'assistant' ? '模型消息' : `消息 ${index + 1}`;
+        const label = role === 'system' ? t('lw.msgSystem') : role === 'user' ? t('lw.msgUser') : role === 'assistant' ? t('lw.msgAssistant') : t('lw.msgN', { n: index + 1 });
         return `<details data-item="${escapeHtml(key)}" ${this.openItems.has(key) ? 'open' : ''}><summary>${label} ${index + 1}<small>${escapeHtml(role ?? '')}</small></summary><pre>${escapeHtml(pretty(asRecord(message)?.content ?? message))}</pre></details>`;
       }).join('') : ''}${Array.isArray(tools) ? tools.map((tool, index) => {
         const definition = asRecord(tool);
         const key = `${trace.id}-tool-${index}`;
-        const name = asRecord(definition?.function)?.name ?? definition?.name ?? `工具 ${index + 1}`;
-        return `<details data-item="${escapeHtml(key)}" ${this.openItems.has(key) ? 'open' : ''}><summary>工具定义：${escapeHtml(name)}<small>${index + 1} / ${tools.length}</small></summary><pre>${escapeHtml(pretty(tool))}</pre></details>`;
-      }).join('') : tools !== undefined ? `<details data-item="${escapeHtml(trace.id)}-tools" ${this.openItems.has(`${trace.id}-tools`) ? 'open' : ''}><summary>工具定义</summary><pre>${escapeHtml(pretty(tools))}</pre></details>` : ''}</div>`;
+        const rawName = asRecord(definition?.function)?.name ?? definition?.name;
+        const name = rawName != null ? String(rawName) : t('lw.toolDefN', { n: index + 1 });
+        return `<details data-item="${escapeHtml(key)}" ${this.openItems.has(key) ? 'open' : ''}><summary>${t('lw.toolDef', { name })}<small>${index + 1} / ${tools.length}</small></summary><pre>${escapeHtml(pretty(tool))}</pre></details>`;
+      }).join('') : tools !== undefined ? `<details data-item="${escapeHtml(trace.id)}-tools" ${this.openItems.has(`${trace.id}-tools`) ? 'open' : ''}><summary>${t('lw.toolDefs')}</summary><pre>${escapeHtml(pretty(tools))}</pre></details>` : ''}</div>`;
     }
     if (trace.kind === 'model.response' && data) return this.renderModelResponse(trace, data);
     if (trace.kind === 'actor.response' && data) {
       const raw = asRecord(data.raw);
       const say = data.say ?? raw?.say ?? data.text ?? data.content;
-      return `${say == null ? '<p class="lw-readable-empty">没有可直接展示的回复文字。</p>' : this.readableText('角色回复', say)}${this.rawTrace(trace)}`;
+      return `${say == null ? `<p class="lw-readable-empty">${t('lw.noReplyText')}</p>` : this.readableText(t('lw.actorReply'), say)}${this.rawTrace(trace)}`;
     }
     if (trace.kind === 'reasoning' && data) {
       const thought = data.text ?? data.content;
-      return `${thought == null ? '<p class="lw-readable-empty">这条记录没有思考正文。</p>' : this.readableText('模型返回的思考', thought)}${this.rawTrace(trace)}`;
+      return `${thought == null ? `<p class="lw-readable-empty">${t('lw.noThought')}</p>` : this.readableText(t('lw.modelThought'), thought)}${this.rawTrace(trace)}`;
     }
     if ((trace.kind === 'tool.call' || trace.kind === 'tool.result') && data) {
       const isCall = trace.kind === 'tool.call';
       const body = isCall ? data.input ?? data.arguments ?? data.args ?? data.params : data.result ?? data.output ?? data.response;
-      return `<div class="lw-readable"><span>${escapeHtml(data.title ?? trace.title ?? (isCall ? '工具调用' : '工具结果'))}</span>${body == null ? '<p>未记录结构化内容，可查看原始记录。</p>' : `<pre>${escapeHtml(pretty(body))}</pre>`}</div>${this.rawTrace(trace)}`;
+      return `<div class="lw-readable"><span>${escapeHtml(data.title ?? trace.title ?? kindName(isCall ? 'tool.call' : 'tool.result'))}</span>${body == null ? `<p>${t('lw.noStructured')}</p>` : `<pre>${escapeHtml(pretty(body))}</pre>`}</div>${this.rawTrace(trace)}`;
     }
     return `<pre>${escapeHtml(pretty(trace.data))}</pre>`;
   }
@@ -450,18 +444,18 @@ export class LogWorkspace {
     const explicitCompleted = body.completed ?? data.completed;
     const explicitPartial = body.partial ?? data.partial;
     const state = explicitPartial === true || explicitCompleted === false || finish === 'length'
-      ? '部分返回'
+      ? t('lw.partial')
       : explicitCompleted === true || finish
-        ? '已完成'
-        : chunks.length ? '可能不完整：未见结束标记' : '完成状态未记录';
+        ? t('lw.completed')
+        : chunks.length ? t('lw.maybeIncomplete') : t('lw.unknownState');
     const usage = asRecord(body.usage) ?? asRecord(data.usage)
       ?? chunks.map((chunk) => asRecord(asRecord(chunk)?.usage)).filter((value) => value !== null).at(-1);
     const usageText = usage ? [
-      usage.prompt_tokens != null ? `输入 ${usage.prompt_tokens}` : '',
-      usage.completion_tokens != null ? `输出 ${usage.completion_tokens}` : '',
-      usage.total_tokens != null ? `合计 ${usage.total_tokens}` : '',
+      usage.prompt_tokens != null ? t('lw.tokensIn', { n: String(usage.prompt_tokens) }) : '',
+      usage.completion_tokens != null ? t('lw.tokensOut', { n: String(usage.completion_tokens) }) : '',
+      usage.total_tokens != null ? t('lw.tokensTotal', { n: String(usage.total_tokens) }) : '',
     ].filter(Boolean).join(' · ') : '';
-    return `<div class="lw-response-summary"><div class="lw-response-facts"><span class="${state === '已完成' ? 'is-complete' : 'is-partial'}">${escapeHtml(state)}</span>${data.status != null ? `<span>HTTP ${escapeHtml(data.status)}</span>` : ''}${data.seconds != null ? `<span>${escapeHtml(data.seconds)} 秒</span>` : ''}${usageText ? `<span>用量：${escapeHtml(usageText)}</span>` : ''}${finish ? `<span>结束原因：${escapeHtml(finish)}</span>` : ''}</div>${text ? this.readableText('回复正文', text) : '<p class="lw-readable-empty">未从结构化响应中提取到正文，可展开原始记录查看。</p>'}</div>${this.rawTrace(trace, '原始 SSE 与完整响应')}`;
+    return `<div class="lw-response-summary"><div class="lw-response-facts"><span class="${state === t('lw.completed') ? 'is-complete' : 'is-partial'}">${escapeHtml(state)}</span>${data.status != null ? `<span>HTTP ${escapeHtml(data.status)}</span>` : ''}${data.seconds != null ? `<span>${t('lw.seconds', { v: String(data.seconds) })}</span>` : ''}${usageText ? `<span>${t('lw.usage', { v: usageText })}</span>` : ''}${finish ? `<span>${t('lw.finishReason', { v: String(finish) })}</span>` : ''}</div>${text ? this.readableText(t('lw.replyBody'), text) : `<p class="lw-readable-empty">${t('lw.noBody')}</p>`}</div>${this.rawTrace(trace, t('lw.rawSse'))}`;
   }
 
   private readableText(label: string, value: unknown): string {
@@ -469,29 +463,29 @@ export class LogWorkspace {
     return `<div class="lw-readable"><span>${escapeHtml(label)}</span><p>${escapeHtml(text)}</p></div>`;
   }
 
-  private rawTrace(trace: LogTrace, label = '完整原始记录'): string {
+  private rawTrace(trace: LogTrace, label = t('lw.rawFull')): string {
     const id = `${trace.id}-raw`;
     return `<details class="lw-raw-trace" data-item="${escapeHtml(id)}" ${this.openItems.has(id) ? 'open' : ''}><summary>${label}</summary><pre>${escapeHtml(pretty(trace.data))}</pre></details>`;
   }
 
   private renderScores(selected?: Entry): string {
     const cards = selected ? selected.card ? [selected.card] : [] : this.detail?.encounters ?? [];
-    if (!cards.length) return '<div class="lw-list-empty"><span>∅</span><h3>没有接待档案</h3><p>这条记录只有过程事件。</p></div>';
+    if (!cards.length) return `<div class="lw-list-empty"><span>∅</span><h3>${t('lw.noScoreFiles')}</h3><p>${t('lw.noScoreFilesSub')}</p></div>`;
     return `<div class="lw-scores">${cards.slice(0, this.scoreLimit).map((card, index) => {
       const key = `score-${card.session_id ?? index}`;
-      return `<article class="lw-score"><div class="lw-score-head"><div><span class="lw-eyebrow">接待 ${String(index + 1).padStart(2, '0')}</span><h3>${escapeHtml(card.profile_name ?? card.session_id ?? '顾客')}</h3><p>${escapeHtml(card.scenario_title ?? card.scenario_type ?? '')}</p></div><div class="lw-score-value"><strong>${card.total == null ? '—' : escapeHtml(card.total)}</strong><span>${escapeHtml(card.verdict ?? '暂无评分')}</span></div></div>${card.rationale ? `<p class="lw-rationale">${escapeHtml(card.rationale)}</p>` : ''}${this.renderReceipts(card)}${this.renderTranscript(card)}${this.renderActions(card)}${this.renderCardPart(card, 'process', '处理过程', key)}<details data-item="${escapeHtml(key)}-raw" ${this.openItems.has(`${key}-raw`) ? 'open' : ''}><summary>完整评分卡</summary><pre>${escapeHtml(pretty(card))}</pre></details></article>`;
-    }).join('')}</div>${cards.length > this.scoreLimit ? `<div class="lw-more"><span>已显示 ${this.scoreLimit} / ${cards.length} 份档案</span><button type="button" data-action="more-scores">再显示 ${Math.min(PAGE_SIZE, cards.length - this.scoreLimit)} 份</button></div>` : ''}`;
+      return `<article class="lw-score"><div class="lw-score-head"><div><span class="lw-eyebrow">${t('lw.encounterN', { n: String(index + 1).padStart(2, '0') })}</span><h3>${escapeHtml(card.profile_name ?? card.session_id ?? t('state.customer'))}</h3><p>${escapeHtml(card.scenario_title ?? card.scenario_type ?? '')}</p></div><div class="lw-score-value"><strong>${card.total == null ? '—' : escapeHtml(card.total)}</strong><span>${escapeHtml(card.verdict ?? t('lw.noVerdict'))}</span></div></div>${card.rationale ? `<p class="lw-rationale">${escapeHtml(card.rationale)}</p>` : ''}${this.renderReceipts(card)}${this.renderTranscript(card)}${this.renderActions(card)}${this.renderCardPart(card, 'process', t('lw.cardProcess'), key)}<details data-item="${escapeHtml(key)}-raw" ${this.openItems.has(`${key}-raw`) ? 'open' : ''}><summary>${t('lw.fullCard')}</summary><pre>${escapeHtml(pretty(card))}</pre></details></article>`;
+    }).join('')}</div>${cards.length > this.scoreLimit ? `<div class="lw-more"><span>${t('lw.showingFiles', { a: this.scoreLimit, b: cards.length })}</span><button type="button" data-action="more-scores">${t('lw.moreFiles', { n: Math.min(PAGE_SIZE, cards.length - this.scoreLimit) })}</button></div>` : ''}`;
   }
 
   private renderTranscript(card: ServerCard): string {
     const transcript = card.transcript;
-    if (!Array.isArray(transcript)) return this.renderCardPart(card, 'transcript', '完整对话', `score-${card.session_id ?? ''}`);
-    if (!transcript.length) return '<div class="lw-transcript-empty">没有对话记录</div>';
-    return `<section class="lw-transcript" aria-label="完整对话"><h4>完整对话 <span>${transcript.length} 条</span></h4><div class="lw-conversation">${transcript.map((row) => {
+    if (!Array.isArray(transcript)) return this.renderCardPart(card, 'transcript', t('lw.fullDialogue'), `score-${card.session_id ?? ''}`);
+    if (!transcript.length) return `<div class="lw-transcript-empty">${t('lw.noDialogue')}</div>`;
+    return `<section class="lw-transcript" aria-label="${t('lw.fullDialogue')}"><h4>${t('lw.fullDialogue')} <span>${t('lw.traceN', { n: transcript.length })}</span></h4><div class="lw-conversation">${transcript.map((row) => {
       const message = asRecord(row);
       const role = String(message?.from ?? message?.role ?? 'system');
       const text = message?.text ?? message?.content ?? row;
-      if (role === 'system') return `<div class="lw-fact"><span>事实记录</span><p>${escapeHtml(pretty(text))}</p></div>`;
+      if (role === 'system') return `<div class="lw-fact"><span>${t('lw.factRecord')}</span><p>${escapeHtml(pretty(text))}</p></div>`;
       return `<div class="lw-dialogue ${role === 'owner' ? 'is-owner' : 'is-customer'}"><div class="lw-speaker">${escapeHtml(actorName(role))}</div><p>${escapeHtml(pretty(text))}</p></div>`;
     }).join('')}</div></section>`;
   }
@@ -500,30 +494,30 @@ export class LogWorkspace {
     const transactions = asRecord(card.transactions);
     if (!transactions) return '';
     const receipts = Array.isArray(transactions.receipts) ? transactions.receipts : [];
-    return `<section class="lw-receipts" aria-label="交易回执"><h4>交易回执 <span>${receipts.length} 张</span></h4>${receipts.length ? receipts.map((value) => {
+    return `<section class="lw-receipts" aria-label="${t('lw.receipts')}"><h4>${t('lw.receipts')} <span>${t('lw.receiptsN', { n: receipts.length })}</span></h4>${receipts.length ? receipts.map((value) => {
       const receipt = asRecord(value);
       if (!receipt) return `<pre>${escapeHtml(pretty(value))}</pre>`;
       const items = Array.isArray(receipt.items) ? receipt.items : [];
       const paid = receipt.status === 'paid';
-      return `<div class="lw-receipt"><div class="lw-receipt-head"><strong>${paid ? '已付款' : escapeHtml(receipt.status ?? '状态未知')}</strong><small>${escapeHtml(receipt.receipt_id ?? '')}</small></div><div class="lw-receipt-items">${items.map((value) => {
+      return `<div class="lw-receipt"><div class="lw-receipt-head"><strong>${paid ? t('lw.paid') : escapeHtml(receipt.status ?? t('lw.statusUnknown'))}</strong><small>${escapeHtml(receipt.receipt_id ?? '')}</small></div><div class="lw-receipt-items">${items.map((value) => {
         const item = asRecord(value);
         if (!item) return `<div>${escapeHtml(pretty(value))}</div>`;
-        return `<div class="lw-receipt-item"><div><b>${escapeHtml(item.name ?? item.sku ?? '商品')}</b><small>${escapeHtml(item.sku ?? '')}${item.offer_id ? ` · ${escapeHtml(item.offer_id)}` : ''}</small></div><span>${escapeHtml(item.qty ?? 1)} × ${money(item.unit_price)}</span><strong>${money(item.total)}</strong></div>`;
-      }).join('')}</div><div class="lw-receipt-total"><span>优惠 ${money(receipt.discount)}</span><strong>实付 ${money(receipt.paid)}</strong></div></div>`;
-    }).join('') : '<p class="lw-no-receipt">没有已付款回执</p>'}</section>`;
+        return `<div class="lw-receipt-item"><div><b>${escapeHtml(item.name ?? item.sku ?? t('lw.product'))}</b><small>${escapeHtml(item.sku ?? '')}${item.offer_id ? ` · ${escapeHtml(item.offer_id)}` : ''}</small></div><span>${escapeHtml(item.qty ?? 1)} × ${money(item.unit_price)}</span><strong>${money(item.total)}</strong></div>`;
+      }).join('')}</div><div class="lw-receipt-total"><span>${t('lw.discountLine', { v: money(receipt.discount) })}</span><strong>${t('lw.paidLine', { v: money(receipt.paid) })}</strong></div></div>`;
+    }).join('') : `<p class="lw-no-receipt">${t('lw.noPaidReceipt')}</p>`}</section>`;
   }
 
   private renderActions(card: ServerCard): string {
     const actions = Array.isArray(card.actions) ? card.actions : [];
-    if (!actions.length) return this.renderCardPart(card, 'actions_taken', '执行动作', `score-${card.session_id ?? ''}`);
-    return `<section class="lw-actions" aria-label="执行动作"><h4>执行动作 <span>${actions.length} 条</span></h4><ol>${actions.map((value, index) => {
+    if (!actions.length) return this.renderCardPart(card, 'actions_taken', t('lw.actions'), `score-${card.session_id ?? ''}`);
+    return `<section class="lw-actions" aria-label="${t('lw.actions')}"><h4>${t('lw.actions')} <span>${t('lw.traceN', { n: actions.length })}</span></h4><ol>${actions.map((value, index) => {
       const entry = asRecord(value);
       const action = asRecord(entry?.action);
       const result = asRecord(entry?.result);
       const failed = result?.applied === false;
-      const label = action?.type ?? action?.name ?? '动作';
+      const label = action?.type ?? action?.name ?? t('lw.action');
       const id = `${card.session_id ?? ''}-action-${index}`;
-      return `<li class="${failed ? 'is-failed' : ''}"><div><strong>${escapeHtml(label)}</strong><span>${action?.sku ? escapeHtml(action.sku) : ''}${action?.qty ? ` × ${escapeHtml(action.qty)}` : ''}</span></div><span class="lw-action-state">${failed ? '未执行' : result?.applied === true ? '已执行' : '结果未知'}</span>${failed && result?.reason ? `<p>原因：${escapeHtml(result.reason)}</p>` : ''}<details data-item="${escapeHtml(id)}" ${this.openItems.has(id) ? 'open' : ''}><summary>查看输入与结果</summary><pre>${escapeHtml(pretty(value))}</pre></details></li>`;
+      return `<li class="${failed ? 'is-failed' : ''}"><div><strong>${escapeHtml(label)}</strong><span>${action?.sku ? escapeHtml(action.sku) : ''}${action?.qty ? ` × ${escapeHtml(action.qty)}` : ''}</span></div><span class="lw-action-state">${failed ? t('lw.notApplied') : result?.applied === true ? t('lw.applied') : t('lw.resultUnknown')}</span>${failed && result?.reason ? `<p>${t('lw.reason', { v: escapeHtml(result.reason) })}</p>` : ''}<details data-item="${escapeHtml(id)}" ${this.openItems.has(id) ? 'open' : ''}><summary>${t('lw.viewInOut')}</summary><pre>${escapeHtml(pretty(value))}</pre></details></li>`;
     }).join('')}</ol></section>`;
   }
 
@@ -535,11 +529,11 @@ export class LogWorkspace {
 
   private renderEvents(selected?: Entry): string {
     const events = (this.detail?.events ?? []).map((event, index) => ({ event, index })).filter(({ event }) => !selected || event.session_id === selected.id || event.encounter_id === selected.id);
-    if (!events.length) return '<div class="lw-list-empty"><span>∅</span><h3>没有匹配的服务事件</h3><p>可切换到全部过程查看整轮事件。</p></div>';
+    if (!events.length) return `<div class="lw-list-empty"><span>∅</span><h3>${t('lw.noEvents')}</h3><p>${t('lw.noEventsSub')}</p></div>`;
     return `<ol class="lw-events">${events.slice(0, this.eventLimit).map(({ event, index }) => {
       const id = `event-${index}`;
       return `<li><details data-item="${id}" ${this.openItems.has(id) ? 'open' : ''}><summary><span class="lw-event-index">${String(index + 1).padStart(3, '0')}</span><strong>${escapeHtml(event.type)}</strong><small>${escapeHtml(timeLabel(event.ts ?? event.timestamp))}</small></summary><pre>${escapeHtml(pretty(event))}</pre></details></li>`;
-    }).join('')}</ol>${events.length > this.eventLimit ? `<div class="lw-more"><span>已显示 ${this.eventLimit} / ${events.length} 条</span><button type="button" data-action="more-events">再显示 ${Math.min(PAGE_SIZE, events.length - this.eventLimit)} 条</button></div>` : ''}`;
+    }).join('')}</ol>${events.length > this.eventLimit ? `<div class="lw-more"><span>${t('lw.showing', { a: this.eventLimit, b: events.length })}</span><button type="button" data-action="more-events">${t('lw.moreTraces', { n: Math.min(PAGE_SIZE, events.length - this.eventLimit) })}</button></div>` : ''}`;
   }
 
   private onClick(event: MouseEvent) {
@@ -558,6 +552,7 @@ export class LogWorkspace {
       case 'shop': this.onClose(); break;
       case 'memory': this.openMemory(); break;
       case 'close-memory': this.closeMemory(); break;
+      case 'lang': setLocale(getLocale() === 'en' ? 'zh' : 'en'); break;
       case 'refresh': void this.loadRuns(); break;
       case 'more-traces': this.traceLimit += PAGE_SIZE; this.renderContent(true); break;
       case 'more-events': this.eventLimit += PAGE_SIZE; this.renderContent(true); break;
@@ -634,10 +629,10 @@ export class LogWorkspace {
     try {
       await navigator.clipboard.writeText(value);
       const old = button.textContent;
-      button.textContent = '已复制';
+      button.textContent = t('lw.copied');
       setTimeout(() => { if (button.isConnected) button.textContent = old; }, 1500);
     } catch {
-      button.textContent = '复制失败';
+      button.textContent = t('lw.copyFailed');
     }
   }
 }

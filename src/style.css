@@ -81,6 +81,12 @@ body.paused #scene-wrap::after {
   content: '暂停中'; position: absolute; inset: 0; display: grid; place-items: center;
   background: rgba(20, 12, 8, 0.45); color: #fff; font-family: var(--pixel); font-size: 34px; letter-spacing: 6px;
 }
+body[data-lang='en'].paused #scene-wrap::after {
+  content: 'PAUSED'; font-size: 40px; letter-spacing: 4px;
+}
+
+/* 语言切换按钮 */
+button.lang { min-width: 44px; font-family: var(--num); font-size: 16px; letter-spacing: 0; }
 
 .bubble {
   position: absolute; transform: translateX(-50%); margin-bottom: 8px;

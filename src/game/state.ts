@@ -1,4 +1,5 @@
 import { createCatalog, RESTOCK_TARGET } from '../data/catalog';
+import { dict, t } from '../i18n';
 import type { ServerCard, ServerState } from '../server/types';
 import type { Product, Session, ShopAction, ShopSnapshot, Verdict, VisitRecord } from '../types';
 
@@ -59,26 +60,26 @@ export class Store {
       if (typeof n === 'number') p.stock = n;
     }
 
-    const t = st.today ?? {};
-    const scores = Array.isArray(t.scores) ? t.scores : [];
-    const revenue = Number(t.revenue ?? 0);
-    const cogs = Number(t.cogs ?? 0);
-    const refunds = Number(t.refunds ?? 0);
-    const fixed = Number(t.fixedCost ?? 0);
-    const restock = Number(t.restock ?? 0);
-    const visited = Number(t.served ?? 0) + Number(t.lost ?? 0);
+    const td = st.today ?? {};
+    const scores = Array.isArray(td.scores) ? td.scores : [];
+    const revenue = Number(td.revenue ?? 0);
+    const cogs = Number(td.cogs ?? 0);
+    const refunds = Number(td.refunds ?? 0);
+    const fixed = Number(td.fixedCost ?? 0);
+    const restock = Number(td.restock ?? 0);
+    const visited = Number(td.served ?? 0) + Number(td.lost ?? 0);
 
     this.today = {
       ...newStats(this.day),
       visitors: visited,
       revenue,
-      profit: t.profit != null ? Number(t.profit) : revenue - cogs - refunds - fixed - restock,
+      profit: td.profit != null ? Number(td.profit) : revenue - cogs - refunds - fixed - restock,
       satSum: scores.reduce((a, c) => a + (typeof c.total === 'number' ? c.total : 0), 0),
       needMet: scores.filter((c) => c.verdict === 'accepted' || c.verdict === 'partial').length,
       personalized: scores.filter((c) => !!c.hidden_need_hit).length,
       restockCost: restock,
       quotes: scores.map((c) => ({
-        name: String(c.profile_name ?? '顾客'),
+        name: String(c.profile_name ?? t('state.customer')),
         text: String(c.rationale ?? ''),
         sat: Number(c.total ?? 0),
       })),
@@ -208,46 +209,16 @@ export class Store {
   }
 }
 
-const VERDICT_ZH: Record<string, string> = {
-  accepted: '办明白了',
-  partial: '部分满意',
-  refused: '被拒绝',
-  escalated: '闹大了',
-  walked_out: '拂袖而去',
-};
-
-const FLAG_ZH: Record<string, string> = {
-  hallucinated_policy: '编造店规',
-  below_cost: '低于成本',
-  over_selling: '硬销',
-  blamed_customer: '怪顾客',
-  safety_miss: '安全失误',
-  agreed_false_claim: '答应虚假说法',
-  agreed_fraud: '配合造假',
-  sold_age_restricted: '卖给未成年人',
-  info_leak: '泄露隐私',
-  ignored_accessibility: '忽视不便',
-  public_interrogation: '当众盘问',
-  embarrassed_customer: '让人难堪',
-  too_slow: '拖太久',
-  wrong_product: '推错货',
-  policy_violation_refund: '违规退款',
-  spoil_surprise: '戳破惊喜',
-  caved_under_threat: '被威胁就退让',
-  denied_experience: '否认顾客感受',
-  flat_refusal: '生硬拒绝',
-  sales_script: '背话术',
-};
-
 /** 服务端评分卡 → 页面通用的离店评价。总分、判词都是服务端算好的，这里只翻译。 */
 export function cardVerdict(c: ServerCard): Verdict {
-  const tags = (c.flags ?? []).map((f) => FLAG_ZH[f] ?? f);
-  if (!tags.length) tags.push(c.verdict ? VERDICT_ZH[c.verdict] ?? c.verdict : '作废');
+  const d = dict();
+  const tags = (c.flags ?? []).map((f) => d.FLAG[f] ?? f);
+  if (!tags.length) tags.push(c.verdict ? d.VERDICT[c.verdict] ?? c.verdict : t('state.void'));
   return {
     satisfaction: typeof c.total === 'number' ? c.total : 0,
     needMet: c.verdict === 'accepted' || c.verdict === 'partial',
     personalized: !!c.hidden_need_hit,
-    comment: String(c.rationale || c.owner_error || c.judge_error || '这一场没有可评的记录。'),
+    comment: String(c.rationale || c.owner_error || c.judge_error || t('state.noRecord')),
     tags,
   };
 }

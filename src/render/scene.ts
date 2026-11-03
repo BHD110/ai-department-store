@@ -1,3 +1,4 @@
+import { t } from '../i18n';
 import type { Stage } from '../game/director';
 import type { Store } from '../game/state';
 import type { CustomerProfile, Mood, Speaker } from '../types';
@@ -29,7 +30,7 @@ export class Scene implements Stage {
     private store: Store,
     private speed: () => number,
     private paused: () => boolean,
-    private shopName = '槐树街百货',
+    private shopName = t('app.brandFallback'),
   ) {
     canvas.width = W;
     canvas.height = H;
@@ -54,7 +55,7 @@ export class Scene implements Stage {
     this.hover = slot?.sku ?? null;
     if (!slot) { this.tip.hidden = true; return; }
     const p = this.store.product(slot.sku)!;
-    this.tip.innerHTML = `<b>${p.emoji} ${p.name}</b><span>¥${p.price} · 库存 ${p.stock}</span><em>${p.tags.join(' · ')}</em>`;
+    this.tip.innerHTML = `<b>${p.emoji} ${p.name}</b><span>${t('scene.tooltipStock', { price: p.price, n: p.stock })}</span><em>${p.tags.join(' · ')}</em>`;
     this.tip.style.left = `${(slot.x / W) * 100}%`;
     this.tip.style.top = `${((slot.y + slot.h + 4) / H) * 100}%`;
     this.tip.hidden = false;

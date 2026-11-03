@@ -1,3 +1,4 @@
+import { t } from '../i18n';
 import type { CustomerTurn, Session, ShopkeeperTurn, SimBackend, Verdict } from '../types';
 import { mockCustomerTurn, mockJudge } from './mockCustomer';
 import { mockShopkeeperTurn } from './mockShopkeeper';
@@ -43,7 +44,8 @@ export class HttpBackend implements SimBackend {
 export class MixedBackend implements SimBackend {
   readonly name: string;
   constructor(private c: SimBackend, private k: SimBackend, private j: SimBackend) {
-    this.name = [c, k, j].every((b) => b.name === c.name) ? c.name : `顾客:${c.name} / 老板:${k.name} / 裁判:${j.name}`;
+    this.name = [c, k, j].every((b) => b.name === c.name) ? c.name
+      : t('backend.mixed', { c: c.name, k: k.name, j: j.name });
   }
   customerTurn(s: Session) { return this.c.customerTurn(s); }
   shopkeeperTurn(s: Session) { return this.k.shopkeeperTurn(s); }

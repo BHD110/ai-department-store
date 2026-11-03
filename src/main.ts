@@ -4,6 +4,7 @@ import { Director } from './game/director';
 import type { GameHost } from './game/host';
 import { LiveDirector } from './game/live';
 import { Store } from './game/state';
+import { initI18n, t } from './i18n';
 import { Scene } from './render/scene';
 import { ServerClient } from './server/client';
 import { loadServerData } from './server/data';
@@ -13,6 +14,8 @@ import { LogWorkspace } from './ui/logs';
 import { showDayReport, showStart } from './ui/modals';
 import { mountSide } from './ui/side';
 import { mountVisitors } from './ui/visitors';
+
+initI18n();
 
 const canvas = () => document.querySelector('#scene') as HTMLCanvasElement;
 const layer = () => document.querySelector('#toast-layer') as HTMLElement;
@@ -78,7 +81,7 @@ function bootMock() {
     canvas(), layer(), store,
     () => director.speed,
     () => director.paused,
-    '小镇百货',
+    t('app.mockStoreName'),
   );
   director = new Director(store, backend, scene);
   mountUi(director);
@@ -91,14 +94,14 @@ function fatal(err: unknown) {
   const m = document.querySelector('#modal') as HTMLElement;
   m.innerHTML = `<div class="sheet">
     <div class="title-art">🔌</div>
-    <h1>没连上服务端</h1>
+    <h1>${t('fatal.title')}</h1>
     <p class="sub">${String(err)}</p>
     <ul class="howto">
-      <li>先在 <code>daily-store-sim/server</code> 里启动：<br><code>python -m uvicorn store.app:app --port 3040</code></li>
-      <li>再刷新这一页；Vite 会把 <code>/api</code> 和 <code>/data</code> 转给 3040</li>
-      <li>只想看像素演出、不调模型：地址后面加 <code>?mock=1</code></li>
+      <li>${t('fatal.step1')}</li>
+      <li>${t('fatal.step2')}</li>
+      <li>${t('fatal.step3')}</li>
     </ul>
-    <button class="primary" onclick="location.reload()">重试</button>
+    <button class="primary" onclick="location.reload()">${t('fatal.retry')}</button>
   </div>`;
   m.hidden = false;
 }

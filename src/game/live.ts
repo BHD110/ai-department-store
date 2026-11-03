@@ -1,5 +1,6 @@
 import { adaptProfile, adaptScenario } from '../server/data';
 import type { DataBundle } from '../server/data';
+import { pick, t } from '../i18n';
 import type { ServerClient } from '../server/client';
 import type { ServerCard, ServerDayReport, ServerEvent, ServerProfile, ServerScenario, ServerState, StatePayload } from '../server/types';
 import type { ChatMessage, Mood, Session, ShopAction, Speaker } from '../types';
@@ -34,17 +35,17 @@ function describeAction(
   const type = String(action.type ?? '');
   const note = String(result?.note ?? '').trim();
   if (result && result.applied === false) {
-    return `✖ ${note || String(result.reason ?? '没有落地')}`;
+    return `✖ ${note || String(result.reason ?? t('live.noEffect'))}`;
   }
   if (type === 'ask') {
-    return result?.effective_ask ? `★ 问到了点子上：${note}` : '';
+    return result?.effective_ask ? t('live.effectiveAsk', { note }) : '';
   }
   if (note) return `${ACTION_ICON[type] ?? '·'} ${note}`;
   const sku = String(action.sku ?? '');
   const name = store.product(sku)?.name ?? sku;
-  if (type === 'sell') return `🛒 售出 ${name} ×${action.qty ?? 1}`;
-  if (type === 'refund') return `💸 退款 ${name || '—'}`;
-  if (type === 'exchange') return `🔁 换货 ${store.product(String(action.old_sku ?? ''))?.name ?? action.old_sku ?? ''} → ${name}`;
+  if (type === 'sell') return t('live.sold', { name, qty: Number(action.qty ?? 1) });
+  if (type === 'refund') return t('live.refunded', { name: name || '—' });
+  if (type === 'exchange') return t('live.exchanged', { a: store.product(String(action.old_sku ?? ''))?.name ?? String(action.old_sku ?? ''), b: name });
   return '';
 }
 
@@ -67,12 +68,12 @@ function adaptAction(action: Record<string, unknown>): ShopAction | null {
  * 每一张分数卡交给像素场景和侧栏；按钮只是给服务端发指令。
  */
 export class LiveDirector implements GameHost {
-  readonly backend = { name: '服务端 · Hermes + MCP' };
+  readonly backend = { name: t('live.backend') };
   speed = 1;
   paused = false;
   running = true;
   busy = false;
-  note = '正在连接服务端…';
+  note = t('live.connecting');
   connected = false;
   readonly profileCount: number;
   readonly storeName: string;
@@ -125,11 +126,11 @@ export class LiveDirector implements GameHost {
       onEvent: (ev) => this.consume(ev),
       onOpen: () => {
         this.connected = true;
-        this.flushStatus(this.busy ? this.note : '已连上服务端');
+        this.flushStatus(this.busy ? this.note : t('live.connected'));
       },
       onError: () => {
         this.connected = false;
-        this.flushStatus('事件流断开了，正在等它自己重连…');
+        this.flushStatus(t('live.streamDown'));
       },
     });
   }
@@ -156,8 +157,8 @@ export class LiveDirector implements GameHost {
     if (typeof p.busy === 'boolean') this.busy = p.busy;
     if (typeof p.paused === 'boolean') this.serverPaused = p.paused;
     if (p.note) this.note = p.note;
-    if (p.settings_error) this.note = '模型配置不完整：' + p.settings_error;
-    if (p.last_error) this.note = '上一轮出错：' + p.last_error;
+    if (p.settings_error) this.note = t('live.settingsError', { msg: p.settings_error });
+    if (p.last_error) this.note = t('live.lastError', { msg: p.last_error });
     this.emit({ t: 'tick' });
     this.flushStatus();
   }
@@ -165,22 +166,22 @@ export class LiveDirector implements GameHost {
   // ------------------------------------------------------------- 按钮
 
   async openDay() {
-    await this.call('正在叫服务端开门…', () => this.client.runDay({ days: 1 }));
+    await this.call(t('live.openDay'), () => this.client.runDay({ days: 1 }));
   }
 
   async stepOne() {
-    await this.call('正在叫服务端接待下一位…', () => this.client.runOne());
+    await this.call(t('live.stepOne'), () => this.client.runOne());
   }
 
   async nextDay() {
-    await this.call('正在开新的一天…', () => this.client.nextDay());
+    await this.call(t('live.nextDay'), () => this.client.nextDay());
     this.lastReport = null;
     this.store.clock = OPEN;
     this.emit({ t: 'tick' });
   }
 
   async restock() {
-    await this.call('正在补货…', () => this.client.restock());
+    await this.call(t('live.restock'), () => this.client.restock());
   }
 
   async togglePause() {
@@ -193,7 +194,7 @@ export class LiveDirector implements GameHost {
         this.applyPayload(await this.client.resume());
       }
     } catch (err) {
-      this.emit({ t: 'error', message: '暂停没生效：' + err });
+      this.emit({ t: 'error', message: t('live.pauseFailed', { msg: String(err) }) });
     }
   }
 
@@ -243,7 +244,7 @@ export class LiveDirector implements GameHost {
         this.store.applyServerState(ev.state as ServerState | undefined);
         this.current = null;
         this.lastReport = null;
-        this.emit({ t: 'system', text: `—— 第 ${ev.day} 天，开门营业 ——` });
+        this.emit({ t: 'system', text: t('live.dayOpen', { n: Number(ev.day ?? 0) }) });
         this.emit({ t: 'tick' });
         break;
       case 'customer:arrive':
@@ -259,9 +260,9 @@ export class LiveDirector implements GameHost {
         const tx = ev.transaction as { last_outcomes?: { status: string; paid?: number; receipt_id?: string; note?: string; reason?: string }[] } | undefined;
         for (const result of tx?.last_outcomes ?? []) {
           if (this.current) this.push(this.current, 'system', result.status === 'paid'
-            ? `已付款 ¥${Number(result.paid ?? 0).toFixed(2)} · 回执 ${result.receipt_id}`
-            : result.status === 'already_paid' ? `该笔已付款，未重复收费 · ${result.receipt_id}`
-            : `未扣款 · ${result.note ?? result.reason ?? '交易未完成'}`);
+            ? t('live.paid', { v: Number(result.paid ?? 0).toFixed(2), id: result.receipt_id ?? '' })
+            : result.status === 'already_paid' ? t('live.alreadyPaid', { id: result.receipt_id ?? '' })
+            : t('live.notCharged', { msg: result.note ?? result.reason ?? '' }));
         }
         break;
       }
@@ -340,7 +341,7 @@ export class LiveDirector implements GameHost {
     if (!session || !text) return;
     const mood = moodFromScore(typeof ev.mood === 'number' ? ev.mood : null);
         this.push(session, 'customer', text, { mood });
-    if (ev.revealed) this.push(session, 'system', '★ 顾客把真正在意的事说出来了');
+    if (ev.revealed) this.push(session, 'system', t('live.revealed'));
     this.enqueue(() => this.stage.bubble('customer', text, mood));
     this.enqueue(() => this.stage.setThinking('shopkeeper'));
   }
@@ -380,8 +381,8 @@ export class LiveDirector implements GameHost {
     const session = this.current;
     this.leaveMood = ev.angry ? 'angry' : ev.exit === 'satisfied' ? 'happy' : 'neutral';
     if (session) {
-      const why = typeof ev.reason === 'string' && ev.reason ? `：${ev.reason}` : '';
-      const head = ev.forced ? '回合数到顶，这一场收场' : ev.angry ? '顾客带着火走了' : '顾客准备离店';
+      const why = typeof ev.reason === 'string' && ev.reason ? `${pick('：', ': ')}${ev.reason}` : '';
+      const head = ev.forced ? t('live.leaveTop') : ev.angry ? t('live.leaveAngry') : t('live.leaveReady');
       this.push(session, 'system', head + why);
     }
     this.enqueue(() => this.stage.setThinking(null));
@@ -406,7 +407,7 @@ export class LiveDirector implements GameHost {
       },
     });
     if (verdict.satisfaction > 0) {
-      this.enqueue(() => this.stage.floatText(`${verdict.satisfaction} 分`, verdict.satisfaction >= 60 ? '#8be28b' : '#ff9a9a'));
+      this.enqueue(() => this.stage.floatText(t('float.score', { n: verdict.satisfaction }), verdict.satisfaction >= 60 ? '#8be28b' : '#ff9a9a'));
     }
     this.enqueue(() => this.stage.setThinking(null));
   }
@@ -427,7 +428,7 @@ export class LiveDirector implements GameHost {
     this.current = null;
     this.busy = false;
     this.emit({ t: 'tick' });
-    this.flushStatus(`第 ${this.store.day} 天 · 打烊`);
+    this.flushStatus(t('live.dayClosed', { n: this.store.day }));
     if (!this.replaying) this.emit({ t: 'dayEnd' });
   }
 

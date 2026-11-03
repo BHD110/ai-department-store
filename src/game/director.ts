@@ -1,5 +1,6 @@
-import { PROFILES } from '../data/profiles';
-import { KIND_WEIGHT, SCENARIO_MAP } from '../data/scenarios';
+import { getProfiles } from '../data/profiles';
+import { KIND_WEIGHT, getScenarioMap } from '../data/scenarios';
+import { t } from '../i18n';
 import type { ChatMessage, CustomerProfile, Mood, Session, ShopAction, SimBackend, Speaker, Verdict } from '../types';
 import { CLOSE, Store, type Settlement } from './state';
 
@@ -31,10 +32,10 @@ export class Director {
   paused = false;
   running = false;
   busy = false;
-  note = '本地 mock';
+  note = t('note.mock');
   connected = true;
-  readonly profileCount = PROFILES.length;
-  readonly storeName = '小镇百货';
+  readonly profileCount = getProfiles().length;
+  readonly storeName = t('app.mockStoreName');
   sessions: Session[] = [];
   current: Session | null = null;
   private listeners: ((e: GameEvent) => void)[] = [];
@@ -89,20 +90,21 @@ export class Director {
   continueNextDay() {
     const r = this.store.nextDay();
     this.emit({ t: 'tick' });
-    if (r.delivered) this.stage.floatText(`预订到货 ${r.delivered} 件`, '#7ec4ff');
+    if (r.delivered) this.stage.floatText(t('float.preorder', { n: r.delivered }), '#7ec4ff');
     this.dayResolve?.();
     this.dayResolve = null;
   }
 
   private chooseCustomer(): CustomerProfile {
-    const pool = PROFILES.filter((p) => p.id !== this.lastCustomer);
+    const pool = getProfiles().filter((p) => p.id !== this.lastCustomer);
     const p = pick(pool);
     this.lastCustomer = p.id;
     return p;
   }
 
   private chooseScenario(p: CustomerProfile) {
-    const list = p.scenarioIds.map((id) => SCENARIO_MAP.get(id)!);
+    const map = getScenarioMap();
+    const list = p.scenarioIds.map((id) => map.get(id)!);
     const ws = list.map((s) => KIND_WEIGHT[s.kind] ?? 1);
     let r = Math.random() * ws.reduce((a, b) => a + b, 0);
     for (let i = 0; i < list.length; i++) if ((r -= ws[i]) <= 0) return list[i];
@@ -151,13 +153,13 @@ export class Director {
     const verdict = await this.backend.judge(s);
     const keep = verdict.needMet || lastMood === 'happy' || lastMood === 'neutral';
     const result = this.store.settle(s, verdict, keep);
-    if (result.abandoned) this.push(s, 'system', `${profile.name}把东西放回了货架。`);
-    this.push(s, 'system', `离店评价：「${verdict.comment}」 满意度 ${verdict.satisfaction}`);
+    if (result.abandoned) this.push(s, 'system', t('system.abandoned', { name: profile.name }));
+    this.push(s, 'system', t('system.verdict', { comment: verdict.comment, sat: verdict.satisfaction }));
     this.emit({ t: 'settled', session: s, verdict, result });
 
     if (result.revenue > 0) this.stage.floatText(`+¥${result.revenue.toFixed(1)}`, '#ffd34e');
     else if (result.revenue < 0) this.stage.floatText(`-¥${(-result.revenue).toFixed(1)}`, '#ff7a7a');
-    this.stage.floatText(`${result.repDelta >= 0 ? '+' : ''}${result.repDelta} 口碑`, result.repDelta >= 0 ? '#8be28b' : '#ff9a9a');
+    this.stage.floatText(`${result.repDelta >= 0 ? '+' : ''}${result.repDelta} ${t('float.rep')}`, result.repDelta >= 0 ? '#8be28b' : '#ff9a9a');
     const leaveMood: Mood = verdict.satisfaction >= 75 ? 'happy' : verdict.satisfaction >= 50 ? 'neutral' : 'angry';
     await this.stage.customerLeave(leaveMood);
     this.current = null;

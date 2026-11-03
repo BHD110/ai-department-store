@@ -1,3 +1,4 @@
+import { pick } from '../i18n';
 import type { Product, Session, ShopAction } from '../types';
 
 export interface Assessment {
@@ -9,7 +10,8 @@ export interface Assessment {
   soldSkus: string[];
 }
 
-const APOLOGY = /抱歉|对不起|不好意思|是我们的问题|给您添麻烦/;
+// 两种语言的道歉说法都要认
+const APOLOGY = /抱歉|对不起|不好意思|是我们的问题|给您添麻烦|sorry|apolog|it'?s on us/i;
 
 export function productOf(inv: Product[], sku: string) {
   return inv.find((p) => p.sku === sku);
@@ -34,7 +36,9 @@ export function assess(s: Session): Assessment {
   const soldProducts = sells.map((a) => productOf(inv, a.sku)).filter(Boolean) as Product[];
   const violations: string[] = [];
   for (const p of soldProducts) {
-    for (const t of sc.avoidTags ?? []) if (p.tags.includes(t)) violations.push(`${p.name}（${t}）`);
+    for (const t of sc.avoidTags ?? []) {
+      if (p.tags.includes(t)) violations.push(pick(`${p.name}（${t}）`, `${p.name} (${t})`));
+    }
   }
   const matches = (p: Product) =>
     (!sc.wantCategory || p.category === sc.wantCategory) &&

@@ -1,3 +1,4 @@
+import { isEn } from '../i18n';
 import type { Product } from '../types';
 import { px, shade, type Ctx } from './sprites';
 
@@ -5,12 +6,11 @@ export const W = 320;
 export const H = 180;
 export const FLOOR_Y = 118;
 
+// 品类一律用 id（mock 目录与服务端目录同一套 id）；服务端会把自己的颜色写进来
 export const CAT_COLOR: Record<string, string> = {
-  清洁: '#4fb3d9', 厨房: '#d9534f', 洗护: '#e78fb3', 文具: '#f0c419',
-  零食: '#f39c3c', 五金: '#8a9aa8', 母婴: '#9ad17a', 家居: '#a17bd1',
-  // 服务端分类：loadServerData 会把真实颜色再写进来
-  clean: '#7fa8c9', bath: '#86b39a', kitchen: '#e0a45e', appliance: '#a68bb5',
-  textile: '#cf7f6b', storage: '#9fb0b8', stationery: '#c9c07f', family: '#b78fa8',
+  clean: '#4fb3d9', kitchen: '#d9534f', bath: '#e78fb3', stationery: '#f0c419',
+  snack: '#f39c3c', hardware: '#8a9aa8', family: '#9ad17a', home: '#a17bd1',
+  appliance: '#a68bb5', textile: '#cf7f6b', storage: '#9fb0b8',
 };
 
 type Stop = [number, string, string];
@@ -72,9 +72,11 @@ export function drawRoom(c: Ctx, clock: number, t: number, shopName = '槐树街
   px(c, wx - 3, wy - 3, ww + 6, 3, '#7a4f2e'); px(c, wx - 3, wy + wh, ww + 6, 4, '#7a4f2e');
   px(c, wx - 3, wy, 3, wh, '#7a4f2e'); px(c, wx + ww, wy, 3, wh, '#7a4f2e');
   px(c, wx + ww / 2 - 1, wy, 2, wh, '#7a4f2e'); px(c, wx, wy + wh / 2 - 1, ww, 2, '#7a4f2e');
-  // 招牌
+  // 招牌：中文取首尾拼短名，英文直接截断
   px(c, 104, 4, 68, 15, '#6b4226'); px(c, 105, 5, 66, 13, '#8b5a33');
-  const sign = shopName.length > 5 ? shopName.slice(0, 3) + shopName.slice(-2) : shopName;
+  const sign = isEn()
+    ? (shopName.length > 13 ? shopName.slice(0, 13) : shopName)
+    : (shopName.length > 5 ? shopName.slice(0, 3) + shopName.slice(-2) : shopName);
   c.fillStyle = '#ffe9b0'; c.font = '10px "ZCOOL QingKe HuangYou", sans-serif'; c.textAlign = 'center';
   c.fillText(sign, 138, 15); c.textAlign = 'left';
   // 吊灯

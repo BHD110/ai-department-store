@@ -5,11 +5,13 @@ export type Category = string;
 export interface Product {
   sku: string;
   name: string;
+  /** 货架/小签用的短名；英文长名不能按空格截，所以由数据自带 */
+  short?: string;
   category: Category;
   price: number; // 售价（元）
   cost: number; // 进价
   stock: number;
-  tags: string[]; // 无香、低敏、大包装、儿童、环保……
+  tags: string[]; // 无香、低敏、大包装、儿童、环保……（跟随当前语言）
   emoji: string;
 }
 

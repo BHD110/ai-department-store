@@ -1,5 +1,7 @@
+import { shortName } from '../data/catalog';
 import type { GameHost } from '../game/host';
 import { CLOSE, OPEN } from '../game/state';
+import { getLocale, setLocale, t } from '../i18n';
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as T;
 const fmtClock = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
@@ -11,30 +13,33 @@ export function stars(rep: number) {
 
 export function mountHud(d: GameHost) {
   const hud = $('#hud');
+  const langLabel = getLocale() === 'en' ? '中文' : 'EN';
   hud.innerHTML = `
-    <div class="brand"><span class="logo">🏪</span><div><b>${d.storeName ?? '槐树街日用百货'}</b><small>AI 小店实验</small></div></div>
-    <div class="stat"><label>第</label><b id="h-day">1</b><label>天</label></div>
+    <div class="brand"><span class="logo">🏪</span><div><b>${d.storeName ?? t('app.brandFallback')}</b><small>${t('hud.tagline')}</small></div></div>
+    <div class="stat"><label>${t('hud.dayBefore')}</label><b id="h-day">1</b><label>${t('hud.dayAfter')}</label></div>
     <div class="stat clock"><b id="h-clock">08:00</b><div class="daybar"><i id="h-daybar"></i></div></div>
     <div class="stat"><label>💰</label><b id="h-cash">0</b></div>
-    <div class="stat rep"><label>口碑</label><b id="h-stars"></b><small id="h-rep"></small></div>
+    <div class="stat rep"><label>${t('hud.rep')}</label><b id="h-stars"></b><small id="h-rep"></small></div>
     <div class="spacer"></div>
-    <div class="conn"><i id="h-conn"></i><span id="h-note">连接中…</span></div>
-    <div class="backend" title="当前接口来源"><i></i><span id="h-backend"></span></div>
+    <div class="conn"><i id="h-conn"></i><span id="h-note">${t('hud.connecting')}</span></div>
+    <div class="backend" title="${t('hud.backendTitle')}"><i></i><span id="h-backend"></span></div>
     <div class="controls">
-      <button id="b-logs" title="打开日志工作台">日志</button>
-      <button id="b-one" title="只接待下一位 (N)">来一位</button>
-      <button id="b-day" title="跑完一整天 (D)">开门一天</button>
-      <button id="b-pause" title="暂停 (空格)">⏸</button>
+      <button id="b-logs" title="${t('hud.btnLogsTitle')}">${t('hud.btnLogs')}</button>
+      <button id="b-one" title="${t('hud.btnOneTitle')}">${t('hud.btnOne')}</button>
+      <button id="b-day" title="${t('hud.btnDayTitle')}">${t('hud.btnDay')}</button>
+      <button id="b-pause" title="${t('hud.pauseTitle')}">⏸</button>
       <button data-speed="1" class="on">1×</button>
       <button data-speed="2">2×</button>
       <button data-speed="4">4×</button>
-      <button id="b-restock" title="补满货架">补货</button>
-      <button id="b-next" title="开新的一天">下一天</button>
-      <button id="b-export" title="导出页面上的对话与评分 JSON">⤓ 导出</button>
+      <button id="b-restock" title="${t('hud.btnRestockTitle')}">${t('hud.btnRestock')}</button>
+      <button id="b-next" title="${t('hud.btnNextTitle')}">${t('hud.btnNext')}</button>
+      <button id="b-export" title="${t('hud.exportTitle')}">${t('hud.btnExport')}</button>
+      <button id="b-lang" class="lang" title="${t('hud.langTitle')}">${langLabel}</button>
     </div>`;
 
   $('#h-backend').textContent = d.backend.name;
   $('#b-logs').onclick = () => window.dispatchEvent(new Event('shop:open-logs'));
+  $('#b-lang').onclick = () => setLocale(getLocale() === 'en' ? 'zh' : 'en');
   const pauseBtn = $<HTMLButtonElement>('#b-pause');
   const oneBtn = $<HTMLButtonElement>('#b-one');
   const dayBtn = $<HTMLButtonElement>('#b-day');
@@ -94,7 +99,7 @@ export function mountHud(d: GameHost) {
     pauseBtn.classList.toggle('on', !!d.paused);
     document.body.classList.toggle('paused', !!d.paused);
     const note = $('#h-note');
-    if (note) note.textContent = d.note || (d.connected === false ? '正在重连…' : '待开门');
+    if (note) note.textContent = d.note || (d.connected === false ? t('hud.reconnecting') : t('hud.waitingOpen'));
     const dot = $('#h-conn');
     if (dot) dot.classList.toggle('off', d.connected === false);
   };
@@ -107,15 +112,15 @@ export function mountHud(d: GameHost) {
     $('#h-cash').textContent = s.cash.toFixed(0);
     $('#h-stars').textContent = stars(s.reputation);
     $('#h-rep').textContent = s.reputation.toFixed(0);
-    const t = s.today;
-    const n = t.visitors || 1;
+    const t0 = s.today;
+    const n = t0.visitors || 1;
     $('#dock').innerHTML = `
-      <div class="kpi"><label>今日接待</label><b>${t.visitors}</b></div>
-      <div class="kpi"><label>营业额</label><b>¥${t.revenue.toFixed(0)}</b></div>
-      <div class="kpi"><label>毛利</label><b>¥${t.profit.toFixed(0)}</b></div>
-      <div class="kpi"><label>平均满意度</label><b>${t.visitors ? (t.satSum / n).toFixed(0) : '—'}</b></div>
-      <div class="kpi"><label>需求满足率</label><b>${t.visitors ? Math.round((t.needMet / n) * 100) + '%' : '—'}</b></div>
-      <div class="kpi"><label>个性化命中</label><b>${t.visitors ? Math.round((t.personalized / n) * 100) + '%' : '—'}</b></div>
+      <div class="kpi"><label>${t('hud.kpiVisitors')}</label><b>${t0.visitors}</b></div>
+      <div class="kpi"><label>${t('hud.kpiRevenue')}</label><b>¥${t0.revenue.toFixed(0)}</b></div>
+      <div class="kpi"><label>${t('hud.kpiProfit')}</label><b>¥${t0.profit.toFixed(0)}</b></div>
+      <div class="kpi"><label>${t('hud.kpiSat')}</label><b>${t0.visitors ? (t0.satSum / n).toFixed(0) : '—'}</b></div>
+      <div class="kpi"><label>${t('hud.kpiNeedMet')}</label><b>${t0.visitors ? Math.round((t0.needMet / n) * 100) + '%' : '—'}</b></div>
+      <div class="kpi"><label>${t('hud.kpiPersonalized')}</label><b>${t0.visitors ? Math.round((t0.personalized / n) * 100) + '%' : '—'}</b></div>
       <div class="lowstock">${lowStock(d)}</div>`;
     setButtons();
   };
@@ -128,6 +133,8 @@ export function mountHud(d: GameHost) {
 
 function lowStock(d: GameHost) {
   const low = d.store.inventory.filter((p) => p.stock <= 2);
-  if (!low.length) return '<span class="ok">货架充足</span>';
-  return '<span class="warn">缺货预警</span>' + low.slice(0, 8).map((p) => `<span class="chip ${p.stock ? '' : 'out'}">${p.emoji}${p.name.split(' ')[0]} ${p.stock}</span>`).join('') + (low.length > 8 ? `<span class="chip">…另 ${low.length - 8} 种</span>` : '');
+  if (!low.length) return `<span class="ok">${t('hud.stockOk')}</span>`;
+  return `<span class="warn">${t('hud.stockWarn')}</span>`
+    + low.slice(0, 8).map((p) => `<span class="chip ${p.stock ? '' : 'out'}">${p.emoji}${shortName(p)} ${p.stock}</span>`).join('')
+    + (low.length > 8 ? `<span class="chip">${t('hud.moreLow', { n: low.length - 8 })}</span>` : '');
 }

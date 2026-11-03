@@ -121,6 +121,7 @@ function adaptProduct(sku: ServerCatalog['skus'][number], startStock: number): P
   return {
     sku: sku.id,
     name: sku.name,
+    short: sku.name.split(' ')[0],
     category: sku.cat,
     price: sku.price,
     cost: sku.cost,
