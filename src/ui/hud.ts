@@ -21,6 +21,7 @@ export function mountHud(d: GameHost) {
     <div class="conn"><i id="h-conn"></i><span id="h-note">连接中…</span></div>
     <div class="backend" title="当前接口来源"><i></i><span id="h-backend"></span></div>
     <div class="controls">
+      <button id="b-logs" title="打开日志工作台">日志</button>
       <button id="b-one" title="只接待下一位 (N)">来一位</button>
       <button id="b-day" title="跑完一整天 (D)">开门一天</button>
       <button id="b-pause" title="暂停 (空格)">⏸</button>
@@ -33,6 +34,7 @@ export function mountHud(d: GameHost) {
     </div>`;
 
   $('#h-backend').textContent = d.backend.name;
+  $('#b-logs').onclick = () => window.dispatchEvent(new Event('shop:open-logs'));
   const pauseBtn = $<HTMLButtonElement>('#b-pause');
   const oneBtn = $<HTMLButtonElement>('#b-one');
   const dayBtn = $<HTMLButtonElement>('#b-day');
@@ -53,6 +55,7 @@ export function mountHud(d: GameHost) {
   nextBtn.onclick = () => { if (d.nextDay && !d.busy) void d.nextDay(); };
 
   window.addEventListener('keydown', (e) => {
+    if (document.body.classList.contains('logs-visible')) return;
     const tag = (e.target as HTMLElement).tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
     if (e.code === 'Space') { e.preventDefault(); togglePause(); }

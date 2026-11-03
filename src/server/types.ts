@@ -174,3 +174,32 @@ export interface ServerEvent {
   type: string;
   [key: string]: unknown;
 }
+
+export interface LogRunSummary {
+  run_id: string;
+  started: string;
+  encounters: number;
+  trace_count: number;
+  legacy: boolean;
+}
+
+export interface LogTrace {
+  id: string;
+  ts: string;
+  run_id: string;
+  encounter_id?: string | null;
+  turn?: number | null;
+  phase?: string;
+  actor?: string;
+  kind: string;
+  title?: string;
+  data: unknown;
+}
+
+export interface LogRunDetail {
+  run_id: string;
+  encounters: ServerCard[];
+  traces: LogTrace[];
+  events: ServerEvent[];
+  coverage: Record<string, unknown>;
+}

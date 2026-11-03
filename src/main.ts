@@ -9,12 +9,34 @@ import { ServerClient } from './server/client';
 import { loadServerData } from './server/data';
 import type { DataBundle } from './server/data';
 import { mountHud } from './ui/hud';
+import { LogWorkspace } from './ui/logs';
 import { showDayReport, showStart } from './ui/modals';
 import { mountSide } from './ui/side';
 import { mountVisitors } from './ui/visitors';
 
 const canvas = () => document.querySelector('#scene') as HTMLCanvasElement;
 const layer = () => document.querySelector('#toast-layer') as HTMLElement;
+const params = new URLSearchParams(location.search);
+const logs = new LogWorkspace(new ServerClient(), () => setView('shop'));
+let shopStarted = false;
+
+function setView(view: 'shop' | 'logs', updateUrl = true) {
+  if (updateUrl) {
+    const url = new URL(location.href);
+    if (view === 'logs') url.searchParams.set('view', 'logs');
+    else url.searchParams.delete('view');
+    history.pushState({ view }, '', url);
+  }
+  if (view === 'logs') {
+    logs.show();
+  } else {
+    logs.hide();
+    if (!shopStarted) {
+      shopStarted = true;
+      void boot();
+    }
+  }
+}
 
 function mountUi(host: GameHost) {
   mountHud(host);
@@ -43,7 +65,7 @@ async function bootLive() {
   Object.assign(window, { shop: { director, store, data, client } });
 
   await director.connect();
-  void showStart(director);
+  if (!director.sessions.length && !director.busy) void showStart(director);
 }
 
 /** 离线开发：原来的规则 mock，?mock=1 才用。 */
@@ -93,4 +115,6 @@ async function boot() {
   }
 }
 
-void boot();
+window.addEventListener('shop:open-logs', () => setView('logs'));
+window.addEventListener('popstate', () => setView(new URLSearchParams(location.search).get('view') === 'logs' ? 'logs' : 'shop', false));
+setView(params.get('view') === 'logs' ? 'logs' : 'shop', false);

@@ -1,6 +1,24 @@
 # 后端接口约定
 
-## 默认：接 daily-store-sim 服务端（事件流）
+## 2026-11-03：当前 v2 交易与日志接口
+
+当前页面默认使用 `/api/v2`。本节是新增契约；下面原有内容仍包含旧版本接口。
+
+- `GET /api/v2/logs/runs`：`{ runs: [{ run_id, started, encounters, trace_count, legacy }] }`。
+- `GET /api/v2/logs/{run_id}`：`{ run_id, encounters, traces, events, coverage }`，支持历史记录与正在接待的记录。旧记录的缺失内容不会补造。
+- `GET /api/v2/event-history`：`{ run_id, events, last_seq }`。首次加载静默恢复；随后连接事件流补齐间隙。
+- `GET /api/v2/events?last=<seq>&run_id=<run_id>`：SSE 重连也接受 `Last-Event-ID`。`stream:ready.last_seq` 是回放水位，不可直接当作已经处理的序号；`subscriber:drop` 后会关闭连接，重新连接补发。
+- `transaction:update`：包含本场 `transaction` 快照（`revision/pending/receipts/paid_total/net_paid_total/adjustments/actions/last_outcomes`）。只有 `receipts[].status=paid` 表示已付款。
+
+每条轨迹包含 `id/ts/run_id/encounter_id/turn/phase/actor/kind/title/data`。`kind` 包括 `prompt/model.request/model.response/reasoning/tool.call/tool.result/actor.response/observation/transaction/error`。模型请求可能位于 `data.body`，直接调用模型时也可能位于 `data`；完整原文均保留，凭据脱敏。
+
+`coverage` 给出实际请求、回复、未完成请求和思考条数。没有思考记录并不等于没有思考；只能说明本次接口未返回或旧采集未保存。
+
+交易及验证说明见 [架构改造记录](ARCHITECTURE-20261103.md)。
+
+---
+
+## v1：旧版 daily-store-sim 事件接口
 
 页面默认不自己驱动对话。账本、顾客、Hermes 店主、评委都在 `daily-store-sim` 服务端跑，页面只订阅事件：
 

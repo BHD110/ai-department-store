@@ -1,4 +1,4 @@
-import type { ServerEvent, StatePayload } from './types';
+import type { LogRunDetail, LogRunSummary, ServerEvent, StatePayload } from './types';
 
 /** 页面只跟服务端说话：账本、模型、密钥全在 3040 那一侧。 */
 export class ServerClient {
@@ -54,6 +54,14 @@ export class ServerClient {
     return this.get<Record<string, unknown>>(`${this.prefix}/schema`);
   }
 
+  logRuns() {
+    return this.get<{ runs: LogRunSummary[] }>('/api/v2/logs/runs');
+  }
+
+  logRun(runId: string) {
+    return this.get<LogRunDetail>(`/api/v2/logs/${encodeURIComponent(runId)}`);
+  }
+
   runDay(body: { days?: number; fresh_memory?: boolean } = {}) {
     return this.post<StatePayload>(`${this.prefix}/run/day`, { days: 1, ...body });
   }
@@ -85,10 +93,16 @@ export class ServerClient {
   /** 订阅事件流。EventSource 自己会重连，这里只负责分发。 */
   events(handlers: {
     onEvent: (ev: ServerEvent) => void;
+    after?: number;
+    runId?: string;
     onOpen?: () => void;
     onError?: () => void;
   }): () => void {
-    const es = new EventSource(this.url(`${this.prefix}/events`));
+    const query = new URLSearchParams();
+    if (handlers.after !== undefined) query.set('last', String(handlers.after));
+    if (handlers.runId) query.set('run_id', handlers.runId);
+    const suffix = query.size ? `?${query}` : '';
+    const es = new EventSource(this.url(`${this.prefix}/events${suffix}`));
     es.onopen = () => handlers.onOpen?.();
     es.onerror = () => handlers.onError?.();
     es.onmessage = (msg) => {

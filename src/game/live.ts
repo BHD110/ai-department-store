@@ -83,6 +83,9 @@ export class LiveDirector implements GameHost {
   private listeners: ((e: GameEvent) => void)[] = [];
   private chain: Promise<void> = Promise.resolve();
   private serverPaused = false;
+  private replaying = false;
+  private lastSeq = 0;
+  private runId = "";
   private currentCard: ServerCard | null = null;
   private leaveMood: Mood = 'neutral';
 
@@ -104,10 +107,23 @@ export class LiveDirector implements GameHost {
   async start() { await this.connect(); }
 
   async connect() {
+    if (this.client.prefix === '/api/v2') {
+      const history = await this.client.get<{ run_id: string; events: ServerEvent[]; last_seq: number }>('/api/v2/event-history');
+      this.runId = history.run_id;
+      this.replaying = true;
+      for (const event of history.events) this.consume(event);
+      this.replaying = false;
+    }
     const payload = await this.client.state();
+    this.runId = payload.run_id ?? this.runId;
     this.applyPayload(payload);
+    const active = this.current;
+    if (active) this.enqueue(() => this.stage.customerEnter(active.profile));
     this.client.events({
-      onEvent: (ev) => this.enqueue(() => this.handle(ev)),      onOpen: () => {
+      after: this.lastSeq,
+      runId: this.runId,
+      onEvent: (ev) => this.consume(ev),
+      onOpen: () => {
         this.connected = true;
         this.flushStatus(this.busy ? this.note : '已连上服务端');
       },
@@ -123,6 +139,7 @@ export class LiveDirector implements GameHost {
   }
 
   private enqueue(fn: () => Promise<void> | void) {
+    if (this.replaying) return;
     this.chain = this.chain.then(fn).catch((err) => {
       this.emit({ t: 'error', message: String(err) });
     });
@@ -197,7 +214,20 @@ export class LiveDirector implements GameHost {
 
   // ------------------------------------------------------------- 事件
 
-  private async handle(ev: ServerEvent) {
+  private consume(ev: ServerEvent) {
+    if (ev.type === 'stream:ready' && typeof ev.run_id === 'string') {
+      if (this.runId && ev.run_id !== this.runId) { location.reload(); return; }
+      this.runId = ev.run_id;
+    }
+    if (typeof ev.seq === 'number') {
+      if (ev.seq <= this.lastSeq) return;
+      this.lastSeq = ev.seq;
+    }
+    // Reduce facts immediately. Only the pixel performance waits for animations.
+    this.handle(ev);
+  }
+
+  private handle(ev: ServerEvent) {
     switch (ev.type) {
       case 'state':
         this.store.applyServerState(ev.state as ServerState | undefined);
@@ -217,14 +247,24 @@ export class LiveDirector implements GameHost {
         this.emit({ t: 'tick' });
         break;
       case 'customer:arrive':
-        await this.arrive(ev);
+        this.arrive(ev);
         break;
       case 'owner:say':
-        await this.ownerSay(ev);
+        this.ownerSay(ev);
         break;
       case 'customer:say':
-        await this.customerSay(ev);
+        this.customerSay(ev);
         break;
+      case 'transaction:update': {
+        const tx = ev.transaction as { last_outcomes?: { status: string; paid?: number; receipt_id?: string; note?: string; reason?: string }[] } | undefined;
+        for (const result of tx?.last_outcomes ?? []) {
+          if (this.current) this.push(this.current, 'system', result.status === 'paid'
+            ? `已付款 ¥${Number(result.paid ?? 0).toFixed(2)} · 回执 ${result.receipt_id}`
+            : result.status === 'already_paid' ? `该笔已付款，未重复收费 · ${result.receipt_id}`
+            : `未扣款 · ${result.note ?? result.reason ?? '交易未完成'}`);
+        }
+        break;
+      }
       case 'action':
         this.action(ev);
         break;
@@ -238,7 +278,7 @@ export class LiveDirector implements GameHost {
         this.card(ev);
         break;
       case 'encounter:end':
-        await this.endEncounter(ev);
+        this.endEncounter(ev);
         break;
       case 'day:end':
         this.endDay(ev);
@@ -248,7 +288,7 @@ export class LiveDirector implements GameHost {
     }
   }
 
-  private async arrive(ev: ServerEvent) {
+  private arrive(ev: ServerEvent) {
     const rawProfile = (ev.profile ?? {}) as ServerProfile;
     const rawScenario = (ev.scenario ?? {}) as ServerScenario;
     const profile = this.data.profileMap.get(String(rawProfile.id)) ?? adaptProfile(rawProfile, [rawScenario]);
@@ -274,35 +314,35 @@ export class LiveDirector implements GameHost {
     }
     this.emit({ t: 'session', session });
     this.emit({ t: 'tick' });
-    await this.stage.customerEnter(profile);
+    this.enqueue(() => this.stage.customerEnter(profile));
 
     const text = String(ev.text ?? '');
     if (text) {
       this.push(session, 'customer', text, { mood: 'neutral' });
-      await this.stage.bubble('customer', text, 'neutral');
+      this.enqueue(() => this.stage.bubble('customer', text, 'neutral'));
     }
-    this.stage.setThinking('shopkeeper');
+    this.enqueue(() => this.stage.setThinking('shopkeeper'));
   }
 
-  private async ownerSay(ev: ServerEvent) {
+  private ownerSay(ev: ServerEvent) {
     const session = this.current;
     const text = String(ev.text ?? '');
     if (!session || !text) return;
-    this.stage.setThinking(null);
+    this.enqueue(() => this.stage.setThinking(null));
     this.push(session, 'shopkeeper', text);
-    await this.stage.bubble('shopkeeper', text);
-    this.stage.setThinking('customer');
+    this.enqueue(() => this.stage.bubble('shopkeeper', text));
+    this.enqueue(() => this.stage.setThinking('customer'));
   }
 
-  private async customerSay(ev: ServerEvent) {
+  private customerSay(ev: ServerEvent) {
     const session = this.current;
     const text = String(ev.text ?? '');
     if (!session || !text) return;
     const mood = moodFromScore(typeof ev.mood === 'number' ? ev.mood : null);
         this.push(session, 'customer', text, { mood });
     if (ev.revealed) this.push(session, 'system', '★ 顾客把真正在意的事说出来了');
-    await this.stage.bubble('customer', text, mood);
-    this.stage.setThinking('shopkeeper');
+    this.enqueue(() => this.stage.bubble('customer', text, mood));
+    this.enqueue(() => this.stage.setThinking('shopkeeper'));
   }
 
   /** 店主做了什么：在对话里留一条可折叠的记录，不是代码日志。 */
@@ -330,9 +370,9 @@ export class LiveDirector implements GameHost {
       if (adapted) session.actions.push(adapted);
     }
     if (action?.type === 'sell' && result?.applied && typeof result.cash === 'number' && result.cash > 0) {
-      this.stage.floatText(`+¥${Number(result.cash).toFixed(1)}`, '#ffd34e');
+      this.enqueue(() => this.stage.floatText(`+¥${Number(result.cash).toFixed(1)}`, '#ffd34e'));
     }
-    this.stage.setThinking('shopkeeper');
+    this.enqueue(() => this.stage.setThinking('shopkeeper'));
     this.emit({ t: 'tick' });
   }
 
@@ -344,7 +384,7 @@ export class LiveDirector implements GameHost {
       const head = ev.forced ? '回合数到顶，这一场收场' : ev.angry ? '顾客带着火走了' : '顾客准备离店';
       this.push(session, 'system', head + why);
     }
-    this.stage.setThinking(null);
+    this.enqueue(() => this.stage.setThinking(null));
   }
 
   private card(ev: ServerEvent) {
@@ -366,16 +406,17 @@ export class LiveDirector implements GameHost {
       },
     });
     if (verdict.satisfaction > 0) {
-      this.stage.floatText(`${verdict.satisfaction} 分`, verdict.satisfaction >= 60 ? '#8be28b' : '#ff9a9a');
+      this.enqueue(() => this.stage.floatText(`${verdict.satisfaction} 分`, verdict.satisfaction >= 60 ? '#8be28b' : '#ff9a9a'));
     }
-    this.stage.setThinking(null);
+    this.enqueue(() => this.stage.setThinking(null));
   }
 
-  private async endEncounter(_ev: ServerEvent) {
-    this.stage.setThinking(null);
+  private endEncounter(_ev: ServerEvent) {
+    this.enqueue(() => this.stage.setThinking(null));
     this.store.clock = Math.min(CLOSE - 1, this.store.clock + 4);
     this.emit({ t: 'tick' });
-    await this.stage.customerLeave(this.leaveMood);
+    const mood = this.leaveMood;
+    this.enqueue(() => this.stage.customerLeave(mood));
     this.current = null;
     this.leaveMood = 'neutral';
   }
@@ -387,7 +428,7 @@ export class LiveDirector implements GameHost {
     this.busy = false;
     this.emit({ t: 'tick' });
     this.flushStatus(`第 ${this.store.day} 天 · 打烊`);
-    this.emit({ t: 'dayEnd' });
+    if (!this.replaying) this.emit({ t: 'dayEnd' });
   }
 
   // ------------------------------------------------------------- 小工具
@@ -401,7 +442,7 @@ export class LiveDirector implements GameHost {
 
   /** 不发网络，只把一条假事件塞进同一条流水线：不开模型也能检查页面。 */
   debugEvent(ev: ServerEvent) {
-    this.enqueue(() => this.handle(ev));
+    this.consume(ev);
   }
 
   exportJSON() {
